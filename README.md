@@ -1,6 +1,6 @@
 # nimaluv_app
 
-A new Flutter project.
+mi proyectito personal
 
 ## Getting Started
 
