@@ -1,7 +1,8 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color background = Color(0xFF03050B);
+  static const Color background = Color(0xFF11091F);
   static const Color backgroundSoft = Color(0xFF070A12);
 
   static const Color surface = Color(0xFF090E1A);
@@ -18,14 +19,28 @@ class AppColors {
   static const Color neonPink = Color(0xFFFF3FD4);
   static const Color neonBlue = Color(0xFF246BFF);
   static const Color neonCyan = Color(0xFF00E5D4);
+  static const Color neonTeal = Color(0xFF00E5D4);
   static const Color neonPurple = Color(0xFF7B2CFF);
   static const Color neonGreen = Color(0xFF00D6A3);
   static const Color neonOrange = Color(0xFFFF8A1F);
+  static const Color neonRed = Color(0xFFFF2B4F);
 
   static const Color accent = Color(0xFFDCE5FF);
   static const Color streak = Color(0xFFF5C76B);
   static const Color danger = Color(0xFFFF6B6B);
 }
+
+const SystemUiOverlayStyle nimaluvSystemUiStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+  systemStatusBarContrastEnforced: false,
+
+  systemNavigationBarColor: Colors.transparent,
+  systemNavigationBarDividerColor: Colors.transparent,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarContrastEnforced: false,
+);
 
 class AppTheme {
   static ThemeData get lightTheme {
@@ -46,9 +61,10 @@ class AppTheme {
       ),
 
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         foregroundColor: AppColors.primary,
         elevation: 0,
+        systemOverlayStyle: nimaluvSystemUiStyle,
         centerTitle: true,
         titleTextStyle: TextStyle(
           color: AppColors.primary,

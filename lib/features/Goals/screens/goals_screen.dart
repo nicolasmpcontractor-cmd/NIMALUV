@@ -165,7 +165,10 @@ class _GoalsScreenState extends State<GoalsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Goals'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Goals'),
+      ),
       body: goals.isEmpty
           ? const Center(
               child: Text('No goals yet.', style: TextStyle(fontSize: 16)),
@@ -224,10 +227,6 @@ class _GoalsScreenState extends State<GoalsScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddGoalModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

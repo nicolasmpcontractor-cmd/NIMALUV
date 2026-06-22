@@ -53,7 +53,10 @@ class KpiScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('KPI de pareja'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('KPI'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

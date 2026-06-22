@@ -222,7 +222,10 @@ class _DatePlannerScreenState extends State<DatePlannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Date Planner'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Date Planner'),
+      ),
       body: datePlans.isEmpty
           ? const Center(
               child: Text('No date plans yet.', style: TextStyle(fontSize: 16)),
@@ -260,10 +263,6 @@ class _DatePlannerScreenState extends State<DatePlannerScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddDatePlanModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

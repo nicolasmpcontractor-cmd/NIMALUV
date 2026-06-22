@@ -91,7 +91,10 @@ class _NotesScreenState extends State<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notes'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Notes'),
+      ),
       body: notes.isEmpty
           ? const Center(
               child: Text('No notes yet.', style: TextStyle(fontSize: 16)),
@@ -115,10 +118,6 @@ class _NotesScreenState extends State<NotesScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddNoteModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

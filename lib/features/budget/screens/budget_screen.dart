@@ -281,7 +281,10 @@ class _BudgetScreenState extends State<BudgetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Budget'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Budget'),
+      ),
       body: Column(
         children: [
           Padding(
@@ -370,10 +373,6 @@ class _BudgetScreenState extends State<BudgetScreen> {
                   ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddExpenseModal,
-        child: const Icon(Icons.add),
       ),
     );
   }

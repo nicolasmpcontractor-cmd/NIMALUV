@@ -215,7 +215,11 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Albums'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Albums'),
+        centerTitle: true,
+      ),
       body: albums.isEmpty
           ? const Center(
               child: Text('No albums yet.', style: TextStyle(fontSize: 16)),
@@ -258,10 +262,6 @@ class _AlbumsScreenState extends State<AlbumsScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddAlbumModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

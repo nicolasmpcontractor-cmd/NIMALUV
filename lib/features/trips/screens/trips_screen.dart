@@ -286,7 +286,10 @@ class _TripsScreenState extends State<TripsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Trips'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Trips'),
+      ),
       body: trips.isEmpty
           ? const Center(
               child: Text('No trips yet.', style: TextStyle(fontSize: 16)),
@@ -327,10 +330,6 @@ class _TripsScreenState extends State<TripsScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddTripModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

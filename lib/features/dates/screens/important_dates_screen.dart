@@ -145,7 +145,10 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Important Dates'), centerTitle: true),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Important Dates'),
+      ),
       body: importantDates.isEmpty
           ? const Center(
               child: Text(
@@ -175,10 +178,6 @@ class _ImportantDatesScreenState extends State<ImportantDatesScreen> {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: openAddDateModal,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
