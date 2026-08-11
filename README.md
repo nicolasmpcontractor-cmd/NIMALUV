@@ -1,4 +1,4 @@
-# nimaluv_app
+nimahub_app
 
 mi proyectito personal
 

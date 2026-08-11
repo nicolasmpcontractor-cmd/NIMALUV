@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nimaluv_app/core/theme/app_theme.dart';
+import 'package:nimahub_app/core/theme/app_theme.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,7 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final double bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: nimaluvSystemUiStyle,
+      value: nimahubSystemUiStyle,
       child: Scaffold(
         extendBody: true,
         backgroundColor: AppColors.background,
@@ -29,7 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           surfaceTintColor: Colors.transparent,
           elevation: 0,
           titleSpacing: 20,
-          systemOverlayStyle: nimaluvSystemUiStyle,
+          systemOverlayStyle: nimahubSystemUiStyle,
           title: const Text(
             'Configuración',
             style: TextStyle(
@@ -43,7 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           padding: EdgeInsets.fromLTRB(20, 8, 20, 110 + bottomInset),
           children: [
             const Text(
-              'Administra las preferencias y la privacidad de NIMALUV.',
+              'Administra las preferencias y la privacidad de NIMAHUB.',
               style: TextStyle(
                 color: AppColors.secondary,
                 fontSize: 14,
@@ -153,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsTile(
                   icon: Icons.info_outline_rounded,
                   accentColor: AppColors.neonPurple,
-                  title: 'Acerca de NIMALUV',
+                  title: 'Acerca de NIMAHUB',
                   subtitle: 'Versión, licencias y soporte',
                   showArrow: true,
                 ),

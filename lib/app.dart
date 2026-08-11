@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/screens/welcome_screen.dart';
 
-const SystemUiOverlayStyle nimaluvNavigationBarStyle = SystemUiOverlayStyle(
+const SystemUiOverlayStyle nimahubNavigationBarStyle = SystemUiOverlayStyle(
   // Barra superior transparente.
   statusBarColor: Colors.transparent,
   statusBarIconBrightness: Brightness.light,
@@ -17,19 +17,19 @@ const SystemUiOverlayStyle nimaluvNavigationBarStyle = SystemUiOverlayStyle(
   systemNavigationBarContrastEnforced: false,
 );
 
-class NimaluvApp extends StatelessWidget {
-  const NimaluvApp({super.key});
+class NimahubApp extends StatelessWidget {
+  const NimahubApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Nimaluv',
+      title: 'Nimahub',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
 
       builder: (context, child) {
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: nimaluvNavigationBarStyle,
+          value: nimahubNavigationBarStyle,
           child: child ?? const SizedBox.shrink(),
         );
       },

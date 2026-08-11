@@ -2,22 +2,21 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'dart:math' as math;
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vibration/vibration.dart';
-import 'package:nimaluv_app/core/theme/app_theme.dart';
-import 'package:nimaluv_app/features/albums/screens/albums_screen.dart';
-import 'package:nimaluv_app/features/budget/screens/budget_screen.dart';
-import 'package:nimaluv_app/features/date_planner/screens/date_planner_screen.dart';
-import 'package:nimaluv_app/features/dates/screens/important_dates_screen.dart';
-import 'package:nimaluv_app/features/goals/screens/goals_screen.dart';
-import 'package:nimaluv_app/features/notes/screens/notes_screen.dart';
-import 'package:nimaluv_app/features/kpi/screens/kpi_screen.dart';
-import 'package:nimaluv_app/features/trips/screens/trips_screen.dart';
-import 'package:nimaluv_app/features/workout/screens/workout_screen.dart';
-import 'package:nimaluv_app/features/nutri_hub/screens/nutri_hub_screen.dart';
-import 'package:nimaluv_app/features/settings/screens/settings_screen.dart';
+import 'package:nimahub_app/core/theme/app_theme.dart';
+import 'package:nimahub_app/features/albums/screens/albums_screen.dart';
+import 'package:nimahub_app/features/budget/screens/budget_screen.dart';
+import 'package:nimahub_app/features/date_planner/screens/date_planner_screen.dart';
+import 'package:nimahub_app/features/dates/screens/important_dates_screen.dart';
+import 'package:nimahub_app/features/goals/screens/goals_screen.dart';
+import 'package:nimahub_app/features/notes/screens/notes_screen.dart';
+import 'package:nimahub_app/features/kpi/screens/kpi_screen.dart';
+import 'package:nimahub_app/features/trips/screens/trips_screen.dart';
+import 'package:nimahub_app/features/workout/screens/workout_screen.dart';
+import 'package:nimahub_app/features/nutri_hub/screens/nutri_hub_screen.dart';
+import 'package:nimahub_app/features/settings/screens/settings_screen.dart';
 
 enum _QuickDestination {
   notes,
@@ -51,6 +50,14 @@ enum _DashboardWidgetType {
   goals,
   trips,
   bannerCarousel,
+  budgetSummary,
+  nextDate,
+  moodSummary,
+  waterTracker,
+  workoutProgress,
+  albumHighlight,
+  specialDateCountdown,
+  goalsProgress,
 }
 
 class _DashboardItem {
@@ -102,9 +109,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _QuickDestination.home; // null significa que se está mostrando el Home.
   _QuickDestination? _currentDestination;
   bool _isFavoritePickerOpen = false;
+  final GlobalKey<_QuickActionOverlayState> _quickActionOverlayKey =
+      GlobalKey<_QuickActionOverlayState>();
   bool _partnerOneGoogleConnected = false;
   bool _partnerTwoGoogleConnected = false;
   bool _isDashboardEditing = false;
+  bool _isDashboardWidgetLibraryOpen = false;
 
   final List<_PetMember> _petMembers = [];
   List<String> _quickFavoriteLabels = [
@@ -129,8 +139,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String? _partnerOnePhotoUrl;
   String? _partnerTwoPhotoUrl;
   String? _heroBackgroundPath;
-
   Matrix4 _heroBackgroundTransform = Matrix4.identity();
+
+  bool _isHeroBackgroundEditing = false;
+
+  String? _previousHeroBackgroundPath;
+  Matrix4 _previousHeroBackgroundTransform = Matrix4.identity();
+
+  late final TransformationController _heroBackgroundController;
 
   late final AnimationController _quickMenuController;
   late final Animation<double> _quickMenuFade;
@@ -141,49 +157,85 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late final List<_DashboardItem> _dashboardItems;
 
   _QuickDestination _previousPreviewDestination = _QuickDestination.home;
+
   Future<void> _openHeroBackgroundEditor() async {
-    String? currentPath = _heroBackgroundPath;
-
-    if (currentPath == null) {
-      final image = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 88,
-      );
-
-      if (!mounted || image == null) return;
-
-      currentPath = image.path;
-
-      setState(() {
-        _heroBackgroundPath = currentPath;
-        _heroBackgroundTransform = Matrix4.identity();
-      });
+    if (_isDashboardEditing || _isHeroBackgroundEditing) {
+      return;
     }
 
-    final result = await showModalBottomSheet<_HeroBackgroundEditResult>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return _HeroBackgroundEditorSheet(
-          initialImagePath: currentPath!,
-          initialTransform: _heroBackgroundTransform,
-          heroHeight: 235,
-        );
-      },
+    HapticFeedback.mediumImpact();
+
+    final pickedImage = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
     );
 
-    if (!mounted || result == null) return;
+    if (!mounted || pickedImage == null) {
+      return;
+    }
+
+    _previousHeroBackgroundPath = _heroBackgroundPath;
+
+    _previousHeroBackgroundTransform = Matrix4.copy(_heroBackgroundTransform);
+
+    _heroBackgroundController.value = Matrix4.identity();
 
     setState(() {
-      _heroBackgroundPath = result.imagePath;
-      _heroBackgroundTransform = Matrix4.copy(result.transform);
+      _heroBackgroundPath = pickedImage.path;
+      _heroBackgroundTransform = Matrix4.identity();
+      _isHeroBackgroundEditing = true;
     });
+  }
+
+  void _saveHeroBackgroundEditor() {
+    if (!_isHeroBackgroundEditing) {
+      return;
+    }
+
+    final Matrix4 savedTransform = Matrix4.copy(
+      _heroBackgroundController.value,
+    );
+
+    setState(() {
+      _heroBackgroundTransform = savedTransform;
+
+      _isHeroBackgroundEditing = false;
+      _previousHeroBackgroundPath = null;
+    });
+
+    HapticFeedback.mediumImpact();
+  }
+
+  void _cancelHeroBackgroundEditor() {
+    if (!_isHeroBackgroundEditing) {
+      return;
+    }
+
+    final Matrix4 restoredTransform = Matrix4.copy(
+      _previousHeroBackgroundTransform,
+    );
+
+    _heroBackgroundController.value = restoredTransform;
+
+    setState(() {
+      _heroBackgroundPath = _previousHeroBackgroundPath;
+
+      _heroBackgroundTransform = restoredTransform;
+
+      _isHeroBackgroundEditing = false;
+      _previousHeroBackgroundPath = null;
+    });
+
+    HapticFeedback.selectionClick();
   }
 
   @override
   void initState() {
     super.initState();
+
+    _heroBackgroundController = TransformationController(
+      Matrix4.copy(_heroBackgroundTransform),
+    );
 
     _dashboardItems = [
       const _DashboardItem(
@@ -239,6 +291,70 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         type: _DashboardWidgetType.bannerCarousel,
         column: 0,
         row: 1,
+        columnSpan: 6,
+        rowSpan: 1,
+      ),
+      const _DashboardItem(
+        id: 'budget_summary',
+        type: _DashboardWidgetType.budgetSummary,
+        column: 0,
+        row: 2,
+        columnSpan: 3,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'next_date',
+        type: _DashboardWidgetType.nextDate,
+        column: 3,
+        row: 2,
+        columnSpan: 3,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'mood_summary',
+        type: _DashboardWidgetType.moodSummary,
+        column: 0,
+        row: 4,
+        columnSpan: 2,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'water_tracker',
+        type: _DashboardWidgetType.waterTracker,
+        column: 2,
+        row: 4,
+        columnSpan: 2,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'workout_progress',
+        type: _DashboardWidgetType.workoutProgress,
+        column: 4,
+        row: 4,
+        columnSpan: 2,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'album_highlight',
+        type: _DashboardWidgetType.albumHighlight,
+        column: 0,
+        row: 6,
+        columnSpan: 3,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'special_date_countdown',
+        type: _DashboardWidgetType.specialDateCountdown,
+        column: 3,
+        row: 6,
+        columnSpan: 3,
+        rowSpan: 2,
+      ),
+      const _DashboardItem(
+        id: 'goals_progress',
+        type: _DashboardWidgetType.goalsProgress,
+        column: 0,
+        row: 8,
         columnSpan: 6,
         rowSpan: 1,
       ),
@@ -320,6 +436,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _heroBackgroundController.dispose();
     _previewTransitionController.dispose();
     _quickMenuController.dispose();
     super.dispose();
@@ -390,6 +507,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _showDestination(_QuickDestination.trips);
         return;
     }
+  }
+
+  void _startDashboardEditingFromItem(_DashboardItem item) {
+    if (_isDashboardEditing) {
+      return;
+    }
+
+    setState(() {
+      _isDashboardEditing = true;
+      _isDashboardWidgetLibraryOpen = false;
+    });
   }
 
   Future<void> _openQuickActionPanel() async {
@@ -734,13 +862,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  Future<void> _handleCenterButtonTap() async {
+    if (_isFavoritePickerOpen) {
+      final overlayState = _quickActionOverlayKey.currentState;
+
+      if (overlayState != null) {
+        overlayState.closeFavoritePicker();
+      } else if (mounted) {
+        setState(() {
+          _isFavoritePickerOpen = false;
+        });
+      }
+
+      return;
+    }
+
+    await toggleQuickMenu();
+  }
+
   Widget _buildQuickDestinationScreen(
     BuildContext context,
     _QuickDestination destination,
   ) {
     switch (destination) {
       case _QuickDestination.notes:
-        return const NotesScreen();
+        return NotesScreen(showCreateButton: !_isQuickMenuOpen);
       case _QuickDestination.goals:
         return const GoalsScreen();
       case _QuickDestination.photo:
@@ -810,6 +956,29 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           label: 'viajes',
           accentColor: Color(0xFF7CFFB2),
         );
+      case _DashboardWidgetType.budgetSummary:
+        return const _BudgetSummaryWidget();
+
+      case _DashboardWidgetType.nextDate:
+        return const _NextDateWidget();
+
+      case _DashboardWidgetType.moodSummary:
+        return const _MoodSummaryWidget();
+
+      case _DashboardWidgetType.waterTracker:
+        return const _WaterTrackerWidget();
+
+      case _DashboardWidgetType.workoutProgress:
+        return const _WorkoutProgressWidget();
+
+      case _DashboardWidgetType.albumHighlight:
+        return const _AlbumHighlightWidget();
+
+      case _DashboardWidgetType.specialDateCountdown:
+        return const _SpecialDateCountdownWidget();
+
+      case _DashboardWidgetType.goalsProgress:
+        return const _GoalsProgressWidget();
       case _DashboardWidgetType.bannerCarousel:
         return const _AchievementBanner();
     }
@@ -826,6 +995,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     setState(() {
       _isDashboardEditing = willStartEditing;
+      _isFavoritePickerOpen = false;
+      _isDashboardWidgetLibraryOpen = false;
+    });
+  }
+
+  void _closeDashboardEditorFromBack() {
+    if (!_isDashboardEditing) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _isDashboardEditing = false;
+      _isDashboardWidgetLibraryOpen = false;
       _isFavoritePickerOpen = false;
     });
   }
@@ -857,7 +1041,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (candidate.column < 0 ||
         candidate.row < 0 ||
         candidate.column + candidate.columnSpan > 6 ||
-        candidate.row + candidate.rowSpan > 10) {
+        candidate.row + candidate.rowSpan > 9) {
       return false;
     }
 
@@ -874,20 +1058,134 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return true;
   }
 
-  void _moveDashboardItem(_DashboardItem item, int newColumn, int newRow) {
-    final movedItem = item.copyWith(column: newColumn, row: newRow);
-    if (!_canPlaceDashboardItem(movedItem, ignoringItemId: item.id)) {
-      HapticFeedback.heavyImpact();
-      return;
+  bool _moveDashboardItem(_DashboardItem item, int column, int row) {
+    const int columnCount = 6;
+    const int rowCount = 9;
+
+    bool fitsInsideGrid(_DashboardItem candidate) {
+      return candidate.column >= 0 &&
+          candidate.row >= 0 &&
+          candidate.column + candidate.columnSpan <= columnCount &&
+          candidate.row + candidate.rowSpan <= rowCount;
     }
-    final int itemIndex = _dashboardItems.indexWhere(
+
+    bool overlaps(_DashboardItem first, _DashboardItem second) {
+      final bool separatedHorizontally =
+          first.column + first.columnSpan <= second.column ||
+          second.column + second.columnSpan <= first.column;
+
+      final bool separatedVertically =
+          first.row + first.rowSpan <= second.row ||
+          second.row + second.rowSpan <= first.row;
+
+      return !separatedHorizontally && !separatedVertically;
+    }
+
+    final int draggedIndex = _dashboardItems.indexWhere(
       (currentItem) => currentItem.id == item.id,
     );
-    if (itemIndex == -1) return;
-    HapticFeedback.selectionClick();
+
+    if (draggedIndex == -1) {
+      return false;
+    }
+
+    final _DashboardItem draggedItem = _dashboardItems[draggedIndex];
+
+    final _DashboardItem candidate = draggedItem.copyWith(
+      column: column,
+      row: row,
+    );
+
+    if (!fitsInsideGrid(candidate)) {
+      return false;
+    }
+
+    final List<_DashboardItem> overlappingItems = _dashboardItems.where((
+      existingItem,
+    ) {
+      if (existingItem.id == draggedItem.id) {
+        return false;
+      }
+
+      return overlaps(candidate, existingItem);
+    }).toList();
+
+    // No hay otro widget debajo: movimiento normal.
+    if (overlappingItems.isEmpty) {
+      setState(() {
+        _dashboardItems[draggedIndex] = candidate;
+      });
+
+      HapticFeedback.selectionClick();
+      return true;
+    }
+
+    // No se permite cubrir varios widgets simultáneamente.
+    if (overlappingItems.length != 1) {
+      return false;
+    }
+
+    final _DashboardItem targetItem = overlappingItems.single;
+
+    final int draggedCellCount = draggedItem.columnSpan * draggedItem.rowSpan;
+
+    final int targetCellCount = targetItem.columnSpan * targetItem.rowSpan;
+
+    // Solo pueden intercambiarse si usan la misma cantidad de celdas.
+    if (draggedCellCount != targetCellCount) {
+      return false;
+    }
+
+    // El widget arrastrado debe quedar alineado con el origen
+    // exacto del widget objetivo.
+    if (candidate.column != targetItem.column ||
+        candidate.row != targetItem.row) {
+      return false;
+    }
+
+    final _DashboardItem relocatedTarget = targetItem.copyWith(
+      column: draggedItem.column,
+      row: draggedItem.row,
+    );
+
+    if (!fitsInsideGrid(relocatedTarget)) {
+      return false;
+    }
+
+    // Comprueba que las dos nuevas posiciones no choquen
+    // con ningún tercer widget.
+    for (final existingItem in _dashboardItems) {
+      if (existingItem.id == draggedItem.id ||
+          existingItem.id == targetItem.id) {
+        continue;
+      }
+
+      if (overlaps(candidate, existingItem) ||
+          overlaps(relocatedTarget, existingItem)) {
+        return false;
+      }
+    }
+
+    // También valida que las formas intercambiadas no se crucen.
+    if (overlaps(candidate, relocatedTarget)) {
+      return false;
+    }
+
+    final int targetIndex = _dashboardItems.indexWhere(
+      (existingItem) => existingItem.id == targetItem.id,
+    );
+
+    if (targetIndex == -1) {
+      return false;
+    }
+
     setState(() {
-      _dashboardItems[itemIndex] = movedItem;
+      _dashboardItems[draggedIndex] = candidate;
+      _dashboardItems[targetIndex] = relocatedTarget;
     });
+
+    HapticFeedback.mediumImpact();
+    return true;
   }
 
   _DashboardItem _createDashboardItem(
@@ -965,12 +1263,92 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           columnSpan: 6,
           rowSpan: 1,
         );
+
+      case _DashboardWidgetType.budgetSummary:
+        return _DashboardItem(
+          id: 'budget_summary',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 3,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.nextDate:
+        return _DashboardItem(
+          id: 'next_date',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 3,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.moodSummary:
+        return _DashboardItem(
+          id: 'mood_summary',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 2,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.waterTracker:
+        return _DashboardItem(
+          id: 'water_tracker',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 2,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.workoutProgress:
+        return _DashboardItem(
+          id: 'workout_progress',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 2,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.albumHighlight:
+        return _DashboardItem(
+          id: 'album_highlight',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 3,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.specialDateCountdown:
+        return _DashboardItem(
+          id: 'special_date_countdown',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 3,
+          rowSpan: 2,
+        );
+
+      case _DashboardWidgetType.goalsProgress:
+        return _DashboardItem(
+          id: 'goals_progress',
+          type: type,
+          column: column,
+          row: row,
+          columnSpan: 6,
+          rowSpan: 1,
+        );
     }
   }
 
   _DashboardItem? _findAvailableDashboardPosition(_DashboardWidgetType type) {
     final template = _createDashboardItem(type, 0, 0);
-    for (int row = 0; row < 10; row++) {
+    for (int row = 0; row < 9; row++) {
       for (int column = 0; column < 6; column++) {
         final candidate = template.copyWith(column: column, row: row);
         if (_canPlaceDashboardItem(candidate)) {
@@ -979,135 +1357,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     }
     return null;
-  }
-
-  void _addDashboardWidget(
-    _DashboardWidgetType type, {
-    required int preferredColumn,
-    required int preferredRow,
-  }) {
-    final bool alreadyExists = _dashboardItems.any((item) => item.type == type);
-
-    if (alreadyExists) return;
-
-    final template = _createDashboardItem(type, 0, 0);
-
-    final int maxColumn = 6 - template.columnSpan;
-
-    final int maxRow = 10 - template.rowSpan;
-
-    final int adjustedColumn = preferredColumn.clamp(0, maxColumn);
-
-    final int adjustedRow = preferredRow.clamp(0, maxRow);
-
-    final preferredItem = template.copyWith(
-      column: adjustedColumn,
-      row: adjustedRow,
-    );
-
-    _DashboardItem? itemToAdd;
-
-    if (_canPlaceDashboardItem(preferredItem)) {
-      itemToAdd = preferredItem;
-    } else {
-      itemToAdd = _findAvailableDashboardPosition(type);
-    }
-
-    if (itemToAdd == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay suficiente espacio disponible.')),
-      );
-      return;
-    }
-
-    HapticFeedback.selectionClick();
-
-    setState(() {
-      _dashboardItems.add(itemToAdd!);
-    });
-  }
-
-  Future<void> _openDashboardWidgetCatalog(
-    int preferredColumn,
-    int preferredRow,
-  ) async {
-    final availableTypes = _DashboardWidgetType.values.where((type) {
-      return !_dashboardItems.any((item) => item.type == type);
-    }).toList();
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: const Color(0xFF18191E),
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Agregar widget',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Selecciona un widget para agregarlo al Home.',
-                  style: TextStyle(color: Color(0xFF989AA3), fontSize: 13),
-                ),
-                const SizedBox(height: 18),
-
-                if (availableTypes.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 30),
-                    child: Center(
-                      child: Text(
-                        'Todos los widgets ya están agregados.',
-                        style: TextStyle(color: Color(0xFF989AA3)),
-                      ),
-                    ),
-                  )
-                else
-                  for (final type in availableTypes)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        _dashboardWidgetIcon(type),
-                        color: _dashboardWidgetColor(type),
-                      ),
-                      title: Text(
-                        _dashboardWidgetName(type),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Icons.add_circle_outline_rounded,
-                        color: Colors.white,
-                      ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-
-                        _addDashboardWidget(
-                          type,
-                          preferredColumn: preferredColumn,
-                          preferredRow: preferredRow,
-                        );
-                      },
-                    ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
   }
 
   String _dashboardWidgetName(_DashboardWidgetType type) {
@@ -1126,6 +1375,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return 'Viajes';
       case _DashboardWidgetType.bannerCarousel:
         return 'Galería de banners';
+      case _DashboardWidgetType.budgetSummary:
+        return 'Resumen de presupuesto';
+      case _DashboardWidgetType.nextDate:
+        return 'Próxima cita';
+      case _DashboardWidgetType.moodSummary:
+        return 'Estado de ánimo';
+      case _DashboardWidgetType.waterTracker:
+        return 'Control de agua';
+      case _DashboardWidgetType.workoutProgress:
+        return 'Progreso workout';
+      case _DashboardWidgetType.albumHighlight:
+        return 'Recuerdo destacado';
+      case _DashboardWidgetType.specialDateCountdown:
+        return 'Fecha especial';
+      case _DashboardWidgetType.goalsProgress:
+        return 'Metas compartidas';
     }
   }
 
@@ -1145,6 +1410,22 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return Icons.flight_takeoff_rounded;
       case _DashboardWidgetType.bannerCarousel:
         return Icons.view_carousel_rounded;
+      case _DashboardWidgetType.budgetSummary:
+        return Icons.account_balance_wallet_rounded;
+      case _DashboardWidgetType.nextDate:
+        return Icons.favorite_rounded;
+      case _DashboardWidgetType.moodSummary:
+        return Icons.sentiment_satisfied_alt_rounded;
+      case _DashboardWidgetType.waterTracker:
+        return Icons.water_drop_rounded;
+      case _DashboardWidgetType.workoutProgress:
+        return Icons.fitness_center_rounded;
+      case _DashboardWidgetType.albumHighlight:
+        return Icons.photo_library_rounded;
+      case _DashboardWidgetType.specialDateCountdown:
+        return Icons.event_rounded;
+      case _DashboardWidgetType.goalsProgress:
+        return Icons.flag_rounded;
     }
   }
 
@@ -1164,7 +1445,313 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return const Color(0xFF7CFFB2);
       case _DashboardWidgetType.bannerCarousel:
         return const Color(0xFFFF3B3B);
+      case _DashboardWidgetType.budgetSummary:
+        return AppColors.neonCyan;
+      case _DashboardWidgetType.nextDate:
+        return AppColors.neonPink;
+      case _DashboardWidgetType.moodSummary:
+        return AppColors.neonPurple;
+      case _DashboardWidgetType.waterTracker:
+        return AppColors.neonBlue;
+      case _DashboardWidgetType.workoutProgress:
+        return const Color(0xFF7CFFB2);
+      case _DashboardWidgetType.albumHighlight:
+        return AppColors.neonPurple;
+      case _DashboardWidgetType.specialDateCountdown:
+        return AppColors.neonOrange;
+      case _DashboardWidgetType.goalsProgress:
+        return AppColors.neonPink;
     }
+  }
+
+  void _toggleDashboardWidgetLibrary() {
+    if (!_isDashboardEditing) {
+      return;
+    }
+
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _isDashboardWidgetLibraryOpen = !_isDashboardWidgetLibraryOpen;
+    });
+  }
+
+  void _addDashboardWidgetFromLibrary(_DashboardWidgetType type) {
+    final bool alreadyExists = _dashboardItems.any((item) => item.type == type);
+
+    if (alreadyExists) {
+      return;
+    }
+
+    final _DashboardItem? itemToAdd = _findAvailableDashboardPosition(type);
+
+    if (itemToAdd == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No hay suficiente espacio disponible.')),
+      );
+
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+
+    setState(() {
+      _dashboardItems.add(itemToAdd);
+      _isDashboardWidgetLibraryOpen = false;
+    });
+  }
+
+  Widget _buildDashboardEditorOverlay(BuildContext context) {
+    final double topInset = MediaQuery.paddingOf(context).top;
+
+    final List<_DashboardWidgetType> availableTypes = _DashboardWidgetType
+        .values
+        .where((type) => !_dashboardItems.any((item) => item.type == type))
+        .toList();
+
+    return Positioned.fill(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Franja superior: abrir catálogo.
+          Positioned(
+            left: -18,
+            right: -18,
+            top: topInset - 4,
+            height: 34,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _toggleDashboardWidgetLibrary,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF24262C).withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: _isDashboardWidgetLibraryOpen
+                        ? Colors.white.withValues(alpha: 0.88)
+                        : Colors.white.withValues(alpha: 0.50),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withValues(
+                        alpha: _isDashboardWidgetLibraryOpen ? 0.20 : 0.10,
+                      ),
+                      blurRadius: _isDashboardWidgetLibraryOpen ? 16 : 9,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: Colors.white,
+                      size: 17,
+                    ),
+                    const SizedBox(width: 9),
+                    const Text(
+                      'Agregar widget',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    AnimatedRotation(
+                      turns: _isDashboardWidgetLibraryOpen ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Color(0xFFB8BBC4),
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Catálogo desplegable debajo de la franja superior.
+          Positioned(
+            left: 16,
+            right: 16,
+            top: topInset + 36,
+            child: IgnorePointer(
+              ignoring: !_isDashboardWidgetLibraryOpen,
+              child: AnimatedSlide(
+                offset: _isDashboardWidgetLibraryOpen
+                    ? Offset.zero
+                    : const Offset(0, -0.12),
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                child: AnimatedOpacity(
+                  opacity: _isDashboardWidgetLibraryOpen ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    height: 190,
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 13),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF202228).withValues(alpha: 0.98),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.62),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.55),
+                          blurRadius: 26,
+                          offset: const Offset(0, 12),
+                        ),
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.10),
+                          blurRadius: 14,
+                        ),
+                      ],
+                    ),
+                    child: availableTypes.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'Todos los widgets ya están agregados.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Color(0xFFA6A8B0),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(left: 3, bottom: 9),
+                                child: Text(
+                                  'Widgets disponibles',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  physics: const BouncingScrollPhysics(),
+                                  itemCount: availableTypes.length,
+                                  separatorBuilder: (context, index) =>
+                                      const SizedBox(width: 10),
+                                  itemBuilder: (context, index) {
+                                    final type = availableTypes[index];
+
+                                    return _buildDashboardLibraryPreview(type);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardLibraryPreview(_DashboardWidgetType type) {
+    final _DashboardItem template = _createDashboardItem(type, 0, 0);
+
+    const double previewCellSize = 42;
+    const double previewGap = 4;
+
+    final double previewWidth =
+        (template.columnSpan * previewCellSize) +
+        ((template.columnSpan - 1) * previewGap);
+
+    final double previewHeight =
+        (template.rowSpan * previewCellSize) +
+        ((template.rowSpan - 1) * previewGap);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        _addDashboardWidgetFromLibrary(type);
+      },
+      child: Container(
+        width: 164,
+        padding: const EdgeInsets.fromLTRB(9, 9, 9, 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2C32),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.18),
+            width: 0.8,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: SizedBox(
+                      width: previewWidth,
+                      height: previewHeight,
+                      child: IgnorePointer(
+                        child: _buildDashboardWidget(template),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                Icon(
+                  _dashboardWidgetIcon(type),
+                  color: _dashboardWidgetColor(type),
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _dashboardWidgetName(type),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${template.columnSpan}×${template.rowSpan}',
+                  style: const TextStyle(
+                    color: Color(0xFF9598A2),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildHomeContent(BuildContext context) {
@@ -1172,8 +1759,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       fit: StackFit.expand,
       clipBehavior: Clip.none,
       children: [
-        const ColoredBox(color: AppColors.background),
-
+        const ColoredBox(color: Colors.black),
         const _BackgroundGlow(),
 
         Column(
@@ -1182,29 +1768,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
               opacity: _isDashboardEditing ? 0.35 : 1.0,
-              child: ImageFiltered(
-                imageFilter: ImageFilter.blur(
-                  sigmaX: _isDashboardEditing ? 10 : 0,
-                  sigmaY: _isDashboardEditing ? 10 : 0,
-                ),
-                child: IgnorePointer(
-                  ignoring: _isDashboardEditing,
-                  child: _HeroHeaderSection(
-                    backgroundPath: _heroBackgroundPath,
-                    backgroundTransform: _heroBackgroundTransform,
-                    onChangeBackground: _openHeroBackgroundEditor,
-                    partnerOneName: _partnerOneName,
-                    partnerTwoName: _partnerTwoName,
-                    partnerOnePhotoUrl: _partnerOnePhotoUrl,
-                    partnerTwoPhotoUrl: _partnerTwoPhotoUrl,
-                    onPartnerOneTap: () {
-                      _editPartnerProfile(isFirstPartner: true);
-                    },
-                    onPartnerTwoTap: () {
-                      _editPartnerProfile(isFirstPartner: false);
-                    },
+              child: Stack(
+                children: [
+                  ImageFiltered(
+                    imageFilter: ImageFilter.blur(
+                      sigmaX: _isDashboardEditing ? 10 : 0,
+                      sigmaY: _isDashboardEditing ? 10 : 0,
+                    ),
+                    child: IgnorePointer(
+                      ignoring: _isDashboardEditing,
+                      child: _HeroHeaderSection(
+                        backgroundPath: _heroBackgroundPath,
+                        onChangeBackground: _openHeroBackgroundEditor,
+
+                        isDashboardEditing: _isDashboardEditing,
+
+                        isBackgroundEditing: _isHeroBackgroundEditing,
+
+                        backgroundController: _heroBackgroundController,
+
+                        onSaveBackground: _saveHeroBackgroundEditor,
+
+                        onCancelBackground: _cancelHeroBackgroundEditor,
+
+                        partnerOneName: _partnerOneName,
+                        partnerTwoName: _partnerTwoName,
+                        partnerOnePhotoUrl: _partnerOnePhotoUrl,
+                        partnerTwoPhotoUrl: _partnerTwoPhotoUrl,
+                        onPartnerOneTap: () {
+                          _editPartnerProfile(isFirstPartner: true);
+                        },
+                        onPartnerTwoTap: () {
+                          _editPartnerProfile(isFirstPartner: false);
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
 
@@ -1230,11 +1830,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
 
-                  Padding(
+                  SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(
-                      24,
+                      18,
                       8,
-                      24,
+                      18,
                       72 + MediaQuery.viewPaddingOf(context).bottom,
                     ),
                     child: _DashboardGrid(
@@ -1243,9 +1843,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       isEditing: _isDashboardEditing,
                       onRemoveItem: _removeDashboardItem,
                       onMoveItem: _moveDashboardItem,
-                      onEmptyCellTap: (column, row) {
-                        _openDashboardWidgetCatalog(column, row);
-                      },
+                      onStartEditingWithItem: _startDashboardEditingFromItem,
                       onLongPress: _toggleDashboardEditing,
                     ),
                   ),
@@ -1254,6 +1852,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ],
         ),
+        if (_isDashboardEditing) _buildDashboardEditorOverlay(context),
       ],
     );
   }
@@ -1309,8 +1908,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         // Fondo opaco de seguridad.
         // Evita que el Home pueda aparecer aunque una pantalla
         // tenga alguna zona parcialmente transparente.
-        const ColoredBox(color: AppColors.background),
-
+        const ColoredBox(color: Colors.black),
         // La preview anterior permanece completamente opaca.
         RepaintBoundary(
           key: ValueKey('preview-previous-$previousDestination'),
@@ -1331,148 +1929,191 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          clipBehavior: Clip.none,
+    return PopScope<Object?>(
+      canPop: !_isDashboardEditing && !_isHeroBackgroundEditing,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          return;
+        }
+
+        if (_isHeroBackgroundEditing) {
+          _cancelHeroBackgroundEditor();
+          return;
+        }
+
+        if (_isDashboardEditing) {
+          _closeDashboardEditorFromBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
           children: [
-            Positioned.fill(child: _buildCurrentContent(context)),
+            SafeArea(
+              bottom: false,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(child: _buildCurrentContent(context)),
 
-            if (_isQuickMenuOpen) ...[
-              Positioned.fill(
-                child: FadeTransition(
-                  // Esta animación se usa solamente para abrir
-                  // y cerrar el menú circular completo.
-                  opacity: _quickMenuFade,
-                  child: IgnorePointer(
-                    ignoring: true,
-                    child: _buildQuickPreviewTransition(),
-                  ),
-                ),
-              ),
-
-              Positioned.fill(
-                child: SlideTransition(
-                  position: _quickMenuSlide,
-                  child: ScaleTransition(
-                    scale: _quickMenuScale,
-                    alignment: Alignment.bottomCenter,
-                    child: _QuickActionOverlay(
-                      progress: _quickMenuController,
-                      initialDestination:
-                          _currentDestination ?? _selectedQuickDestination,
-                      favoriteLabels: _quickFavoriteLabels,
-                      onFavoriteChanged: _replaceQuickFavorite,
-                      onFavoritePickerOpenChanged: _setFavoritePickerOpen,
-                      onSelectedActionChanged: _setSelectedQuickActionLabel,
-                      onCenteredDestinationChanged: (destination) {
-                        _changeQuickPreview(destination);
-                      },
-
-                      onClose: closeQuickMenu,
-
-                      onQuickHome: () {
-                        _showDestination(_QuickDestination.home);
-                      },
-
-                      onQuickNote: () {
-                        _showDestination(_QuickDestination.notes);
-                      },
-
-                      onQuickGoals: () {
-                        _showDestination(_QuickDestination.goals);
-                      },
-
-                      onQuickFinance: () {
-                        _showDestination(_QuickDestination.finance);
-                      },
-
-                      onQuickDatePlanner: () {
-                        _showDestination(_QuickDestination.datePlanner);
-                      },
-
-                      onQuickDate: () {
-                        _showDestination(_QuickDestination.importantDates);
-                      },
-
-                      onQuickKpi: () {
-                        _showDestination(_QuickDestination.kpi);
-                      },
-
-                      onQuickTrips: () {
-                        _showDestination(_QuickDestination.trips);
-                      },
-
-                      onQuickWorkout: () {
-                        _showDestination(_QuickDestination.workout);
-                      },
-
-                      onQuickNutriHub: () {
-                        _showDestination(_QuickDestination.nutriHub);
-                      },
-
-                      onQuickSettings: () {
-                        _showDestination(_QuickDestination.settings);
-                      },
-
-                      onQuickAlbumPhoto: () {
-                        _showDestination(_QuickDestination.photo);
-                      },
-                    ),
-                  ),
-                ),
-              ),
-            ],
-
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                ignoring: _isFavoritePickerOpen,
-                child: IgnorePointer(
-                  ignoring: _isFavoritePickerOpen || _isDashboardEditing,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    opacity: _isDashboardEditing ? 0.22 : 1.0,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: _isDashboardEditing ? 10 : 0,
-                        sigmaY: _isDashboardEditing ? 10 : 0,
-                      ),
-                      child: _NimaluvBottomNav(
-                        isQuickMenuOpen: _quickMenuController.value > 0.0,
-                        isFavoritePickerOpen: _isFavoritePickerOpen,
-                        selectedQuickActionLabel: _selectedQuickActionLabel,
-                        quickMenuProgress: _quickMenuController,
-                        onQuickActionsTap: _openQuickActionPanel,
-                        onCenterTap: toggleQuickMenu,
-                        onCenterLongPress: _goHomeFromCenterLongPress,
-                        onMembersTap: _openMembersPanel,
+                  if (_isQuickMenuOpen) ...[
+                    Positioned.fill(
+                      child: FadeTransition(
+                        // Esta animación se usa solamente para abrir
+                        // y cerrar el menú circular completo.
+                        opacity: _quickMenuFade,
+                        child: IgnorePointer(
+                          ignoring: true,
+                          child: _buildQuickPreviewTransition(),
+                        ),
                       ),
                     ),
+
+                    Positioned.fill(
+                      child: SlideTransition(
+                        position: _quickMenuSlide,
+                        child: ScaleTransition(
+                          scale: _quickMenuScale,
+                          alignment: Alignment.bottomCenter,
+                          child: _QuickActionOverlay(
+                            key: _quickActionOverlayKey,
+                            progress: _quickMenuController,
+                            initialDestination:
+                                _currentDestination ??
+                                _selectedQuickDestination,
+                            favoriteLabels: _quickFavoriteLabels,
+                            onFavoriteChanged: _replaceQuickFavorite,
+                            onFavoritePickerOpenChanged: _setFavoritePickerOpen,
+                            onSelectedActionChanged:
+                                _setSelectedQuickActionLabel,
+                            onCenteredDestinationChanged: (destination) {
+                              _changeQuickPreview(destination);
+                            },
+
+                            onClose: closeQuickMenu,
+
+                            onQuickHome: () {
+                              _showDestination(_QuickDestination.home);
+                            },
+
+                            onQuickNote: () {
+                              _showDestination(_QuickDestination.notes);
+                            },
+
+                            onQuickGoals: () {
+                              _showDestination(_QuickDestination.goals);
+                            },
+
+                            onQuickFinance: () {
+                              _showDestination(_QuickDestination.finance);
+                            },
+
+                            onQuickDatePlanner: () {
+                              _showDestination(_QuickDestination.datePlanner);
+                            },
+
+                            onQuickDate: () {
+                              _showDestination(
+                                _QuickDestination.importantDates,
+                              );
+                            },
+
+                            onQuickKpi: () {
+                              _showDestination(_QuickDestination.kpi);
+                            },
+
+                            onQuickTrips: () {
+                              _showDestination(_QuickDestination.trips);
+                            },
+
+                            onQuickWorkout: () {
+                              _showDestination(_QuickDestination.workout);
+                            },
+
+                            onQuickNutriHub: () {
+                              _showDestination(_QuickDestination.nutriHub);
+                            },
+
+                            onQuickSettings: () {
+                              _showDestination(_QuickDestination.settings);
+                            },
+
+                            onQuickAlbumPhoto: () {
+                              _showDestination(_QuickDestination.photo);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      ignoring: _isFavoritePickerOpen,
+                      child: IgnorePointer(
+                        ignoring: _isFavoritePickerOpen || _isDashboardEditing,
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          opacity: _isDashboardEditing ? 0.22 : 1.0,
+                          child: ImageFiltered(
+                            imageFilter: ImageFilter.blur(
+                              sigmaX: _isDashboardEditing ? 10 : 0,
+                              sigmaY: _isDashboardEditing ? 10 : 0,
+                            ),
+                            child: _NimahubBottomNav(
+                              isQuickMenuOpen: _quickMenuController.value > 0.0,
+                              isFavoritePickerOpen: _isFavoritePickerOpen,
+                              selectedQuickActionLabel:
+                                  _selectedQuickActionLabel,
+                              quickMenuProgress: _quickMenuController,
+                              onQuickActionsTap: _openQuickActionPanel,
+                              onCenterTap: _handleCenterButtonTap,
+                              onCenterLongPress: _goHomeFromCenterLongPress,
+                              onMembersTap: _openMembersPanel,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 40 + MediaQuery.viewPaddingOf(context).bottom,
+                    child: Center(
+                      child: IgnorePointer(
+                        ignoring: _isDashboardEditing,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _handleCenterButtonTap,
+                          onLongPress: _goHomeFromCenterLongPress,
+                          child: const SizedBox(width: 86, height: 52),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            Positioned(
+
+            // Línea neón en todo el borde izquierdo.
+            const Positioned(
               left: 0,
+              top: 0,
+              bottom: 0,
+              child: _FullScreenNeonEdge(alignment: Alignment.centerLeft),
+            ),
+
+            // Línea neón en todo el borde derecho.
+            const Positioned(
               right: 0,
-              bottom: 40 + MediaQuery.viewPaddingOf(context).bottom,
-              child: Center(
-                child: IgnorePointer(
-                  ignoring: _isDashboardEditing,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: toggleQuickMenu,
-                    onLongPress: _goHomeFromCenterLongPress,
-                    child: const SizedBox(width: 86, height: 52),
-                  ),
-                ),
-              ),
+              top: 0,
+              bottom: 0,
+              child: _FullScreenNeonEdge(alignment: Alignment.centerRight),
             ),
           ],
         ),
@@ -1481,14 +2122,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-class _DashboardGrid extends StatelessWidget {
+enum _DashboardDropKind { move, swap, invalid }
+
+class _DashboardGrid extends StatefulWidget {
   const _DashboardGrid({
     required this.items,
     required this.itemBuilder,
     required this.isEditing,
     required this.onRemoveItem,
     required this.onMoveItem,
-    required this.onEmptyCellTap,
+    required this.onStartEditingWithItem,
     required this.onLongPress,
   });
 
@@ -1498,32 +2141,392 @@ class _DashboardGrid extends StatelessWidget {
   final bool isEditing;
   final ValueChanged<String> onRemoveItem;
 
-  final void Function(_DashboardItem item, int column, int row) onMoveItem;
-
-  final void Function(int column, int row) onEmptyCellTap;
+  final bool Function(_DashboardItem item, int column, int row) onMoveItem;
+  final ValueChanged<_DashboardItem> onStartEditingWithItem;
   final VoidCallback onLongPress;
 
+  // Compatible con la versión anterior.
+
+  // Compatible con la versión nueva que abre el catálogo
+  // desde un cuadrito específico.
+
+  @override
+  State<_DashboardGrid> createState() => _DashboardGridState();
+}
+
+class _DashboardGridState extends State<_DashboardGrid>
+    with SingleTickerProviderStateMixin {
   static const int columnCount = 6;
-  static const int rowCount = 10;
+  static const int rowCount = 9;
 
   static const double horizontalGap = 5;
   static const double verticalGap = 5;
+
+  final GlobalKey _gridKey = GlobalKey();
+
+  _DashboardItem? _draggedItem;
+  String? _pressedItemId;
+  bool _dragStartedFromHome = false;
+
+  late final AnimationController _widgetPressController;
+
+  int? _previewColumn;
+  int? _previewRow;
+
+  _DashboardDropKind _previewKind = _DashboardDropKind.invalid;
+
+  String? _rejectedItemId;
+  int _rejectionGeneration = 0;
+
+  bool get _previewIsValid => _previewKind != _DashboardDropKind.invalid;
+
+  bool get _previewIsSwap => _previewKind == _DashboardDropKind.swap;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _widgetPressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 190),
+      reverseDuration: const Duration(milliseconds: 320),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _DashboardGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (!widget.isEditing && oldWidget.isEditing) {
+      _widgetPressController.stop();
+      _widgetPressController.value = 0;
+
+      // Flutter hará un build inmediatamente después,
+      // por eso aquí no hace falta setState.
+      _draggedItem = null;
+      _pressedItemId = null;
+      _dragStartedFromHome = false;
+
+      _previewColumn = null;
+      _previewRow = null;
+      _previewKind = _DashboardDropKind.invalid;
+
+      // Evita repetir un salto antiguo al volver al Home.
+      _rejectedItemId = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetPressController.dispose();
+    super.dispose();
+  }
+
+  double _itemWidth(_DashboardItem item, double cellSize) {
+    return (item.columnSpan * cellSize) +
+        ((item.columnSpan - 1) * horizontalGap);
+  }
+
+  double _itemHeight(_DashboardItem item, double cellSize) {
+    return (item.rowSpan * cellSize) + ((item.rowSpan - 1) * verticalGap);
+  }
+
+  bool _itemsOverlap(_DashboardItem first, _DashboardItem second) {
+    final bool separatedHorizontally =
+        first.column + first.columnSpan <= second.column ||
+        second.column + second.columnSpan <= first.column;
+
+    final bool separatedVertically =
+        first.row + first.rowSpan <= second.row ||
+        second.row + second.rowSpan <= first.row;
+
+    return !separatedHorizontally && !separatedVertically;
+  }
+
+  bool _fitsInsideGrid(_DashboardItem item) {
+    return item.column >= 0 &&
+        item.row >= 0 &&
+        item.column + item.columnSpan <= columnCount &&
+        item.row + item.rowSpan <= rowCount;
+  }
+
+  _DashboardDropKind _resolveDropKind({
+    required _DashboardItem candidate,
+    required _DashboardItem draggedItem,
+  }) {
+    if (!_fitsInsideGrid(candidate)) {
+      return _DashboardDropKind.invalid;
+    }
+
+    final List<_DashboardItem> overlappingItems = widget.items.where((
+      existingItem,
+    ) {
+      if (existingItem.id == draggedItem.id) {
+        return false;
+      }
+
+      return _itemsOverlap(candidate, existingItem);
+    }).toList();
+
+    if (overlappingItems.isEmpty) {
+      return _DashboardDropKind.move;
+    }
+
+    if (overlappingItems.length != 1) {
+      return _DashboardDropKind.invalid;
+    }
+
+    final _DashboardItem targetItem = overlappingItems.single;
+
+    final int draggedCellCount = draggedItem.columnSpan * draggedItem.rowSpan;
+
+    final int targetCellCount = targetItem.columnSpan * targetItem.rowSpan;
+
+    if (draggedCellCount != targetCellCount) {
+      return _DashboardDropKind.invalid;
+    }
+
+    if (candidate.column != targetItem.column ||
+        candidate.row != targetItem.row) {
+      return _DashboardDropKind.invalid;
+    }
+
+    final _DashboardItem relocatedTarget = targetItem.copyWith(
+      column: draggedItem.column,
+      row: draggedItem.row,
+    );
+
+    if (!_fitsInsideGrid(relocatedTarget)) {
+      return _DashboardDropKind.invalid;
+    }
+
+    for (final existingItem in widget.items) {
+      if (existingItem.id == draggedItem.id ||
+          existingItem.id == targetItem.id) {
+        continue;
+      }
+
+      if (_itemsOverlap(candidate, existingItem) ||
+          _itemsOverlap(relocatedTarget, existingItem)) {
+        return _DashboardDropKind.invalid;
+      }
+    }
+
+    if (_itemsOverlap(candidate, relocatedTarget)) {
+      return _DashboardDropKind.invalid;
+    }
+
+    return _DashboardDropKind.swap;
+  }
+
+  void _updateDragPreview({
+    required Offset globalPosition,
+    required _DashboardItem item,
+    required double cellSize,
+    required double gridWidth,
+    required double gridHeight,
+  }) {
+    final gridContext = _gridKey.currentContext;
+
+    if (gridContext == null) {
+      return;
+    }
+
+    final renderObject = gridContext.findRenderObject();
+
+    if (renderObject is! RenderBox) {
+      return;
+    }
+
+    final Offset localPosition = renderObject.globalToLocal(globalPosition);
+
+    // Si el centro del dedo sale completamente de la cuadrícula,
+    // se oculta la previsualización.
+    if (localPosition.dx < 0 ||
+        localPosition.dy < 0 ||
+        localPosition.dx > gridWidth ||
+        localPosition.dy > gridHeight) {
+      // El dedo salió de la cuadrícula, por ejemplo hacia
+      // la zona superior de eliminación. Solo ocultamos
+      // la previsualización de celdas.
+      _clearPlacementPreview();
+      return;
+    }
+
+    final double itemWidth = _itemWidth(item, cellSize);
+    final double itemHeight = _itemHeight(item, cellSize);
+
+    final double horizontalStride = cellSize + horizontalGap;
+    final double verticalStride = cellSize + verticalGap;
+
+    // El dedo representa el centro del widget.
+    final double desiredLeft = localPosition.dx - (itemWidth / 2);
+
+    final double desiredTop = localPosition.dy - (itemHeight / 2);
+
+    int candidateColumn = (desiredLeft / horizontalStride).round();
+
+    int candidateRow = (desiredTop / verticalStride).round();
+
+    final int maxColumn = columnCount - item.columnSpan;
+    final int maxRow = rowCount - item.rowSpan;
+
+    candidateColumn = candidateColumn.clamp(0, maxColumn).toInt();
+
+    candidateRow = candidateRow.clamp(0, maxRow).toInt();
+
+    final candidate = item.copyWith(column: candidateColumn, row: candidateRow);
+
+    final _DashboardDropKind previewKind = _resolveDropKind(
+      candidate: candidate,
+      draggedItem: item,
+    );
+
+    final bool changed =
+        _draggedItem?.id != item.id ||
+        _previewColumn != candidateColumn ||
+        _previewRow != candidateRow ||
+        _previewKind != previewKind;
+    if (!changed) {
+      return;
+    }
+
+    setState(() {
+      _draggedItem = item;
+      _previewColumn = candidateColumn;
+      _previewRow = candidateRow;
+      _previewKind = previewKind;
+    });
+  }
+
+  void _clearPlacementPreview() {
+    if (_previewColumn == null &&
+        _previewRow == null &&
+        _previewKind == _DashboardDropKind.invalid) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      // Solo desaparecen los cuadritos de colocación.
+      // El widget continúa marcado como arrastrado.
+      _previewColumn = null;
+      _previewRow = null;
+      _previewKind = _DashboardDropKind.invalid;
+    });
+  }
+
+  void _clearDragPreview() {
+    if (_draggedItem == null && _previewColumn == null && _previewRow == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _draggedItem = null;
+      _pressedItemId = null;
+      _previewColumn = null;
+      _previewRow = null;
+      _previewKind = _DashboardDropKind.invalid;
+    });
+  }
+
+  void _triggerRejectedDrop(String itemId) {
+    final int currentGeneration = _rejectionGeneration + 1;
+
+    HapticFeedback.heavyImpact();
+
+    setState(() {
+      _rejectedItemId = itemId;
+      _rejectionGeneration = currentGeneration;
+    });
+
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      if (!mounted) {
+        return;
+      }
+
+      // Evita borrar una animación más reciente.
+      if (_rejectionGeneration != currentGeneration ||
+          _rejectedItemId != itemId) {
+        return;
+      }
+
+      setState(() {
+        _rejectedItemId = null;
+      });
+    });
+  }
+
+  Widget _buildAnimatedDashboardItem(_DashboardItem item) {
+    final Widget child = widget.itemBuilder(item);
+
+    if (_rejectedItemId != item.id) {
+      return child;
+    }
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('${item.id}-rejection-$_rejectionGeneration'),
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+      builder: (context, animationValue, child) {
+        final double jump = math.sin(math.pi * animationValue);
+
+        return Transform.translate(
+          offset: Offset(0, -9 * jump),
+          child: Transform.scale(scale: 1 - (0.035 * jump), child: child),
+        );
+      },
+      child: child,
+    );
+  }
+
+  void _setPressedItem(String itemId) {
+    if (_pressedItemId != itemId) {
+      setState(() {
+        _pressedItemId = itemId;
+      });
+    }
+
+    _widgetPressController.forward(from: 0);
+  }
+
+  void _clearPressedItem([String? itemId]) {
+    if (_pressedItemId == null) {
+      return;
+    }
+
+    if (itemId != null && _pressedItemId != itemId) {
+      return;
+    }
+
+    _widgetPressController.reverse().whenComplete(() {
+      if (!mounted || _draggedItem != null) {
+        return;
+      }
+
+      setState(() {
+        _pressedItemId = null;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double availableWidth = constraints.maxWidth;
-        final double availableHeight = constraints.maxHeight;
 
-        final double cellFromWidth =
+        final double cellSize =
             (availableWidth - ((columnCount - 1) * horizontalGap)) /
             columnCount;
-
-        final double cellFromHeight =
-            (availableHeight - ((rowCount - 1) * verticalGap)) / rowCount;
-
-        final double cellSize = math.min(cellFromWidth, cellFromHeight);
 
         final double gridWidth =
             (columnCount * cellSize) + ((columnCount - 1) * horizontalGap);
@@ -1534,167 +2537,416 @@ class _DashboardGrid extends StatelessWidget {
         return Align(
           alignment: Alignment.topCenter,
           child: SizedBox(
+            key: _gridKey,
             width: gridWidth,
             height: gridHeight,
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onLongPress: onLongPress,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  if (isEditing)
-                    for (int row = 0; row < rowCount; row++)
-                      for (int column = 0; column < columnCount; column++)
-                        Positioned(
-                          left: column * (cellSize + horizontalGap),
-                          top: row * (cellSize + verticalGap),
-                          width: cellSize,
-                          height: cellSize,
-                          child: DragTarget<_DashboardItem>(
-                            onWillAcceptWithDetails: (details) {
-                              return true;
-                            },
-                            onAcceptWithDetails: (details) {
-                              final _DashboardItem draggedItem = details.data;
+            child: DragTarget<_DashboardItem>(
+              onWillAcceptWithDetails: (details) {
+                return true;
+              },
 
-                              final int maxColumn =
-                                  columnCount - draggedItem.columnSpan;
+              onAcceptWithDetails: (details) {
+                final int? column = _previewColumn;
+                final int? row = _previewRow;
 
-                              final int maxRow = rowCount - draggedItem.rowSpan;
+                if (column == null || row == null || !_previewIsValid) {
+                  _triggerRejectedDrop(details.data.id);
 
-                              final int centeredColumn =
-                                  (column - (draggedItem.columnSpan ~/ 2))
-                                      .clamp(0, maxColumn)
-                                      .toInt();
+                  _clearDragPreview();
+                  return;
+                }
 
-                              final int centeredRow =
-                                  (row - (draggedItem.rowSpan ~/ 2))
-                                      .clamp(0, maxRow)
-                                      .toInt();
+                final bool movementSucceeded = widget.onMoveItem(
+                  details.data,
+                  column,
+                  row,
+                );
 
-                              onMoveItem(
-                                draggedItem,
-                                centeredColumn,
-                                centeredRow,
-                              );
-                            },
-                            builder: (context, candidateData, rejectedData) {
-                              final bool isReceiving = candidateData.isNotEmpty;
+                if (!movementSucceeded) {
+                  _triggerRejectedDrop(details.data.id);
+                }
 
-                              final bool isCellOccupied = items.any((item) {
-                                final bool insideColumns =
-                                    column >= item.column &&
-                                    column < item.column + item.columnSpan;
+                _clearDragPreview();
+              },
 
-                                final bool insideRows =
-                                    row >= item.row &&
-                                    row < item.row + item.rowSpan;
+              onLeave: (_) {
+                _clearPlacementPreview();
+              },
 
-                                return insideColumns && insideRows;
-                              });
-
-                              return GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: isEditing && !isCellOccupied
-                                    ? () {
-                                        onEmptyCellTap(column, row);
-                                      }
-                                    : null,
+              builder: (context, candidateData, rejectedData) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: widget.isEditing ? widget.onLongPress : null,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Cuadrícula base.
+                      if (widget.isEditing)
+                        for (int row = 0; row < rowCount; row++)
+                          for (int column = 0; column < columnCount; column++)
+                            Positioned(
+                              left: column * (cellSize + horizontalGap),
+                              top: row * (cellSize + verticalGap),
+                              width: cellSize,
+                              height: cellSize,
+                              child: IgnorePointer(
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 120),
+                                  duration: const Duration(milliseconds: 100),
                                   decoration: BoxDecoration(
-                                    color: isReceiving
-                                        ? Colors.white.withValues(alpha: 0.10)
-                                        : Colors.white.withValues(alpha: 0.015),
+                                    color: Colors.white.withValues(
+                                      alpha: 0.015,
+                                    ),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: isReceiving
-                                          ? Colors.white.withValues(alpha: 0.55)
-                                          : Colors.white.withValues(
-                                              alpha: 0.10,
-                                            ),
-                                      width: isReceiving ? 1.2 : 0.6,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.10,
+                                      ),
+                                      width: 0.6,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
-                          ),
-                        ),
+                              ),
+                            ),
 
-                  for (final item in items)
-                    Positioned(
-                      key: ValueKey(item.id),
-                      left: item.column * (cellSize + horizontalGap),
-                      top: item.row * (cellSize + verticalGap),
-                      width:
-                          (item.columnSpan * cellSize) +
-                          ((item.columnSpan - 1) * horizontalGap),
-                      height:
-                          (item.rowSpan * cellSize) +
-                          ((item.rowSpan - 1) * verticalGap),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Positioned.fill(
-                            child: isEditing
+                      // Widgets reales.
+                      for (final item in widget.items)
+                        Positioned(
+                          key: ValueKey(item.id),
+                          left: item.column * (cellSize + horizontalGap),
+                          top: item.row * (cellSize + verticalGap),
+                          width: _itemWidth(item, cellSize),
+                          height: _itemHeight(item, cellSize),
+                          child: AnimatedOpacity(
+                            duration: const Duration(milliseconds: 90),
+                            curve: Curves.easeOut,
+                            opacity: _draggedItem?.id == item.id ? 0.13 : 1.0,
+
+                            child: widget.isEditing && !_dragStartedFromHome
                                 ? Draggable<_DashboardItem>(
                                     data: item,
+                                    maxSimultaneousDrags: 1,
+
                                     dragAnchorStrategy:
                                         (draggable, dragContext, position) {
-                                          final RenderBox renderBox =
-                                              dragContext.findRenderObject()!
-                                                  as RenderBox;
+                                          final renderObject = dragContext
+                                              .findRenderObject();
+
+                                          if (renderObject is! RenderBox) {
+                                            return Offset.zero;
+                                          }
 
                                           return Offset(
-                                            renderBox.size.width / 2,
-                                            renderBox.size.height / 2,
+                                            renderObject.size.width / 2,
+                                            renderObject.size.height / 2,
                                           );
                                         },
+
+                                    // Dentro del editor, el movimiento comienza
+                                    // inmediatamente al arrastrar.
+                                    onDragStarted: () {
+                                      setState(() {
+                                        _rejectedItemId = null;
+                                        _pressedItemId = null;
+                                        _draggedItem = item;
+                                      });
+
+                                      _widgetPressController.stop();
+                                      _widgetPressController.value = 0;
+
+                                      HapticFeedback.selectionClick();
+                                    },
+
+                                    onDragUpdate: (details) {
+                                      _updateDragPreview(
+                                        globalPosition: details.globalPosition,
+                                        item: item,
+                                        cellSize: cellSize,
+                                        gridWidth: gridWidth,
+                                        gridHeight: gridHeight,
+                                      );
+                                    },
+
+                                    onDragEnd: (details) {
+                                      if (!details.wasAccepted) {
+                                        _triggerRejectedDrop(item.id);
+                                      }
+
+                                      _clearDragPreview();
+                                    },
+
                                     feedback: Material(
                                       color: Colors.transparent,
                                       child: SizedBox(
-                                        width:
-                                            (item.columnSpan * cellSize) +
-                                            ((item.columnSpan - 1) *
-                                                horizontalGap),
-                                        height:
-                                            (item.rowSpan * cellSize) +
-                                            ((item.rowSpan - 1) * verticalGap),
+                                        width: _itemWidth(item, cellSize),
+                                        height: _itemHeight(item, cellSize),
                                         child: Opacity(
-                                          opacity: 0.88,
-                                          child: itemBuilder(item),
+                                          opacity: 0.92,
+                                          child: widget.itemBuilder(item),
                                         ),
                                       ),
                                     ),
+
                                     childWhenDragging: IgnorePointer(
-                                      child: Opacity(
-                                        opacity: 0.22,
-                                        child: itemBuilder(item),
-                                      ),
+                                      child: widget.itemBuilder(item),
                                     ),
+
                                     child: GestureDetector(
                                       behavior: HitTestBehavior.opaque,
                                       onTap: () {
-                                        onRemoveItem(item.id);
+                                        widget.onRemoveItem(item.id);
                                       },
-                                      child: IgnorePointer(
-                                        child: itemBuilder(item),
-                                      ),
+                                      child: _buildAnimatedDashboardItem(item),
                                     ),
                                   )
-                                : itemBuilder(item),
-                          ),
-                        ],
-                      ),
-                    ),
-                ], // children del Stack principal
-              ), // Stack principal
-            ), // GestureDetector
-          ), // SizedBox
-        ); // Align
+                                : LongPressDraggable<_DashboardItem>(
+                                    data: item,
+
+                                    // Ahora siempre será necesario mantener
+                                    // presionado el widget para moverlo.
+                                    delay: const Duration(milliseconds: 430),
+
+                                    hapticFeedbackOnStart: false,
+                                    maxSimultaneousDrags: 1,
+
+                                    dragAnchorStrategy:
+                                        (draggable, dragContext, position) {
+                                          final renderObject = dragContext
+                                              .findRenderObject();
+
+                                          if (renderObject is! RenderBox) {
+                                            return Offset.zero;
+                                          }
+
+                                          return Offset(
+                                            renderObject.size.width / 2,
+                                            renderObject.size.height / 2,
+                                          );
+                                        },
+
+                                    onDragStarted: () {
+                                      final bool startedFromHome =
+                                          !widget.isEditing;
+
+                                      setState(() {
+                                        _rejectedItemId = null;
+                                        _dragStartedFromHome = startedFromHome;
+                                        _draggedItem = item;
+                                      });
+
+                                      _widgetPressController.reverse();
+
+                                      HapticFeedback.mediumImpact();
+
+                                      if (startedFromHome) {
+                                        widget.onStartEditingWithItem(item);
+                                      }
+                                    },
+
+                                    onDragUpdate: (details) {
+                                      _updateDragPreview(
+                                        globalPosition: details.globalPosition,
+                                        item: item,
+                                        cellSize: cellSize,
+                                        gridWidth: gridWidth,
+                                        gridHeight: gridHeight,
+                                      );
+                                    },
+
+                                    onDragEnd: (details) {
+                                      if (!details.wasAccepted) {
+                                        _triggerRejectedDrop(item.id);
+                                      }
+
+                                      _clearDragPreview();
+
+                                      _widgetPressController.value = 0;
+
+                                      if (mounted) {
+                                        setState(() {
+                                          _pressedItemId = null;
+                                          _dragStartedFromHome = false;
+                                        });
+                                      }
+                                    },
+
+                                    feedback: AnimatedBuilder(
+                                      animation: _widgetPressController,
+                                      builder: (context, child) {
+                                        final double curvedValue = Curves
+                                            .easeInOutCubic
+                                            .transform(
+                                              _widgetPressController.value,
+                                            );
+
+                                        final double scaleValue =
+                                            1.0 - (0.06 * curvedValue);
+
+                                        return Transform.scale(
+                                          scale: scaleValue,
+                                          alignment: Alignment.center,
+                                          child: child,
+                                        );
+                                      },
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: SizedBox(
+                                          width: _itemWidth(item, cellSize),
+                                          height: _itemHeight(item, cellSize),
+                                          child: Opacity(
+                                            opacity: 0.92,
+                                            child: widget.itemBuilder(item),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                    childWhenDragging: IgnorePointer(
+                                      child: widget.itemBuilder(item),
+                                    ),
+
+                                    child: Listener(
+                                      behavior: HitTestBehavior.opaque,
+
+                                      onPointerDown: (_) {
+                                        _setPressedItem(item.id);
+                                      },
+
+                                      onPointerUp: (_) {
+                                        _clearPressedItem(item.id);
+                                      },
+
+                                      onPointerCancel: (_) {
+                                        _clearPressedItem(item.id);
+                                      },
+
+                                      child: AnimatedBuilder(
+                                        animation: _widgetPressController,
+                                        builder: (context, child) {
+                                          if (_pressedItemId != item.id) {
+                                            return child!;
+                                          }
+
+                                          final double curvedValue = Curves
+                                              .easeInOutCubic
+                                              .transform(
+                                                _widgetPressController.value,
+                                              );
+
+                                          final double scaleValue =
+                                              1.0 - (0.06 * curvedValue);
+
+                                          return Transform.scale(
+                                            scale: scaleValue,
+                                            alignment: Alignment.center,
+                                            child: child,
+                                          );
+                                        },
+
+                                        // Dentro del editor, un toque corto
+                                        // todavía puede quitar el widget.
+                                        child: widget.isEditing
+                                            ? GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.opaque,
+                                                onTap: () {
+                                                  widget.onRemoveItem(item.id);
+                                                },
+                                                child:
+                                                    _buildAnimatedDashboardItem(
+                                                      item,
+                                                    ),
+                                              )
+                                            : _buildAnimatedDashboardItem(item),
+                                      ),
+                                    ),
+                                  ),
+                          ), // Cierra AnimatedOpacity
+                        ), // Cierra Positioned
+                      // Previsualización de la totalidad de
+                      // cuadritos requeridos.
+                      if (widget.isEditing &&
+                          _draggedItem != null &&
+                          _previewColumn != null &&
+                          _previewRow != null)
+                        for (
+                          int previewRow = 0;
+                          previewRow < _draggedItem!.rowSpan;
+                          previewRow++
+                        )
+                          for (
+                            int previewColumn = 0;
+                            previewColumn < _draggedItem!.columnSpan;
+                            previewColumn++
+                          )
+                            Positioned(
+                              left:
+                                  (_previewColumn! + previewColumn) *
+                                  (cellSize + horizontalGap),
+                              top:
+                                  (_previewRow! + previewRow) *
+                                  (cellSize + verticalGap),
+                              width: cellSize,
+                              height: cellSize,
+                              child: IgnorePointer(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 80),
+                                  curve: Curves.easeOutCubic,
+                                  decoration: BoxDecoration(
+                                    color: _previewIsSwap
+                                        ? const Color(
+                                            0xFFB388FF,
+                                          ).withValues(alpha: 0.20)
+                                        : _previewIsValid
+                                        ? Colors.white.withValues(alpha: 0.16)
+                                        : const Color(
+                                            0xFFFF3B3B,
+                                          ).withValues(alpha: 0.18),
+
+                                    borderRadius: BorderRadius.circular(10),
+
+                                    border: Border.all(
+                                      color: _previewIsSwap
+                                          ? const Color(
+                                              0xFFD7C2FF,
+                                            ).withValues(alpha: 0.95)
+                                          : _previewIsValid
+                                          ? Colors.white.withValues(alpha: 0.82)
+                                          : const Color(
+                                              0xFFFF5252,
+                                            ).withValues(alpha: 0.90),
+                                      width: 1.3,
+                                    ),
+
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: _previewIsSwap
+                                            ? const Color(
+                                                0xFFB388FF,
+                                              ).withValues(alpha: 0.26)
+                                            : _previewIsValid
+                                            ? Colors.white.withValues(
+                                                alpha: 0.18,
+                                              )
+                                            : const Color(
+                                                0xFFFF3B3B,
+                                              ).withValues(alpha: 0.22),
+                                        blurRadius: 9,
+                                        spreadRadius: 0.2,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
       },
-    ); // LayoutBuilder
+    );
   }
 }
 
@@ -1970,8 +3222,12 @@ class _HeroBackgroundEditorSheetState
 class _HeroHeaderSection extends StatelessWidget {
   const _HeroHeaderSection({
     required this.backgroundPath,
-    required this.backgroundTransform,
     required this.onChangeBackground,
+    required this.isDashboardEditing,
+    required this.isBackgroundEditing,
+    required this.backgroundController,
+    required this.onSaveBackground,
+    required this.onCancelBackground,
     required this.partnerOneName,
     required this.partnerTwoName,
     required this.partnerOnePhotoUrl,
@@ -1981,21 +3237,52 @@ class _HeroHeaderSection extends StatelessWidget {
   });
 
   final String? backgroundPath;
-  final Matrix4 backgroundTransform;
   final VoidCallback onChangeBackground;
+
+  final bool isDashboardEditing;
+  final bool isBackgroundEditing;
+
+  final TransformationController backgroundController;
+
+  final VoidCallback onSaveBackground;
+  final VoidCallback onCancelBackground;
 
   final String partnerOneName;
   final String partnerTwoName;
   final String? partnerOnePhotoUrl;
   final String? partnerTwoPhotoUrl;
+
   final VoidCallback onPartnerOneTap;
   final VoidCallback onPartnerTwoTap;
+
+  void _setBackgroundZoom(double newZoom) {
+    final matrix = Matrix4.copy(backgroundController.value);
+
+    final currentZoom = matrix.getMaxScaleOnAxis();
+
+    if (!currentZoom.isFinite || currentZoom <= 0) {
+      return;
+    }
+
+    final ratio = newZoom / currentZoom;
+    final storage = matrix.storage;
+
+    const scaleIndexes = <int>[0, 1, 2, 4, 5, 6, 8, 9, 10];
+
+    for (final index in scaleIndexes) {
+      storage[index] *= ratio;
+    }
+
+    backgroundController.value = matrix;
+  }
 
   @override
   Widget build(BuildContext context) {
     const double heroHeight = 170;
     return GestureDetector(
-      onLongPress: onChangeBackground,
+      onLongPress: isDashboardEditing || isBackgroundEditing
+          ? null
+          : onChangeBackground,
       child: SizedBox(
         height: heroHeight,
         width: double.infinity,
@@ -2013,61 +3300,48 @@ class _HeroHeaderSection extends StatelessWidget {
                       ),
                     )
                   : ClipRect(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return Transform(
-                            transform: backgroundTransform,
-                            alignment: Alignment.center,
-                            child: Image.file(
-                              File(backgroundPath!),
+                      child: InteractiveViewer(
+                        transformationController: backgroundController,
+
+                        minScale: 1.0,
+                        maxScale: 6.0,
+
+                        // Permite desplazar libremente toda la fotografía,
+                        // incluso después de aplicar bastante zoom.
+                        boundaryMargin: const EdgeInsets.all(1000),
+
+                        constrained: true,
+                        alignment: Alignment.center,
+                        panAxis: PanAxis.free,
+
+                        panEnabled: false,
+                        scaleEnabled: false,
+                        // Reduce el movimiento automático al soltar.
+                        interactionEndFrictionCoefficient: 0.001,
+
+                        clipBehavior: Clip.hardEdge,
+
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SizedBox(
                               width: constraints.maxWidth,
                               height: constraints.maxHeight,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.center,
-                            ),
-                          );
-                        },
+                              child: ColoredBox(
+                                color: Colors.black,
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.center,
+                                  child: Image.file(
+                                    File(backgroundPath!),
+                                    filterQuality: FilterQuality.high,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-            ),
-
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      stops: const [0.0, 0.45, 1.0],
-                      colors: [
-                        Colors.black.withValues(alpha: 0.10),
-                        Colors.black.withValues(alpha: 0.16),
-                        Colors.black.withValues(alpha: 0.22),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            Positioned.fill(
-              child: Container(color: Colors.black.withValues(alpha: 0.18)),
-            ),
-
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.44),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.18),
-                    ],
-                  ),
-                ),
-              ),
             ),
 
             Positioned(
@@ -2129,6 +3403,151 @@ class _HeroHeaderSection extends StatelessWidget {
                 onPartnerTwoTap: onPartnerTwoTap,
               ),
             ),
+
+            if (isBackgroundEditing && backgroundPath != null)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ClipRect(
+                          child: InteractiveViewer(
+                            transformationController: backgroundController,
+
+                            minScale: 1.0,
+                            maxScale: 6.0,
+
+                            // Permite recorrer la foto completa después del zoom.
+                            boundaryMargin: const EdgeInsets.all(1000),
+
+                            constrained: true,
+                            alignment: Alignment.center,
+                            panAxis: PanAxis.free,
+
+                            panEnabled: true,
+                            scaleEnabled: true,
+
+                            interactionEndFrictionCoefficient: 0.0008,
+
+                            clipBehavior: Clip.hardEdge,
+
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SizedBox(
+                                  width: constraints.maxWidth,
+                                  height: constraints.maxHeight,
+                                  child: ColoredBox(
+                                    color: Colors.black,
+                                    child: FittedBox(
+                                      fit: BoxFit.contain,
+                                      alignment: Alignment.center,
+                                      child: Image.file(
+                                        File(backgroundPath!),
+                                        filterQuality: FilterQuality.high,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Borde que representa el marco final.
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.72),
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Barra vertical de zoom.
+                      Positioned(
+                        right: 4,
+                        top: 16,
+                        bottom: 16,
+                        width: 50,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return ValueListenableBuilder<Matrix4>(
+                              valueListenable: backgroundController,
+                              builder: (context, matrix, child) {
+                                final zoom = matrix
+                                    .getMaxScaleOnAxis()
+                                    .clamp(1.0, 6.0)
+                                    .toDouble();
+
+                                return Center(
+                                  child: RotatedBox(
+                                    quarterTurns: 3,
+                                    child: SizedBox(
+                                      width: constraints.maxHeight,
+                                      child: SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          activeTrackColor: Colors.white,
+                                          inactiveTrackColor: Colors.white
+                                              .withValues(alpha: 0.28),
+                                          thumbColor: Colors.white,
+                                          overlayColor: Colors.white.withValues(
+                                            alpha: 0.12,
+                                          ),
+                                          trackHeight: 3,
+                                          thumbShape:
+                                              const RoundSliderThumbShape(
+                                                enabledThumbRadius: 7,
+                                              ),
+                                          overlayShape:
+                                              const RoundSliderOverlayShape(
+                                                overlayRadius: 14,
+                                              ),
+                                        ),
+                                        child: Slider(
+                                          min: 1.0,
+                                          max: 6.0,
+                                          value: zoom,
+                                          onChanged: _setBackgroundZoom,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+
+                      Positioned(
+                        left: 12,
+                        bottom: 10,
+                        child: _HeroEditActionButton(
+                          icon: Icons.close_rounded,
+                          onTap: onCancelBackground,
+                          isPrimary: false,
+                        ),
+                      ),
+
+                      Positioned(
+                        left: 12,
+                        top: 10,
+                        child: _HeroEditActionButton(
+                          icon: Icons.check_rounded,
+                          onTap: onSaveBackground,
+                          isPrimary: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -2175,7 +3594,7 @@ class _HomeHeader extends StatelessWidget {
                     padding: EdgeInsets.fromLTRB(20, 0, 8, 0),
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: _NimaluvWordmark(),
+                      child: _NimahubWordmark(),
                     ),
                   ),
                 ),
@@ -2188,8 +3607,8 @@ class _HomeHeader extends StatelessWidget {
   }
 }
 
-class _NimaluvWordmark extends StatelessWidget {
-  const _NimaluvWordmark();
+class _NimahubWordmark extends StatelessWidget {
+  const _NimahubWordmark();
 
   @override
   Widget build(BuildContext context) {
@@ -2198,114 +3617,44 @@ class _NimaluvWordmark extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Transform.translate(
-        offset: const Offset(-2, 0),
+        offset: const Offset(-30, 0),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              'NIMA',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontSize: logoFontSize,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 3.0,
-                height: 1,
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.95),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 1,
                   ),
-                  Shadow(
-                    color: Colors.white.withValues(alpha: 0.38),
-                    blurRadius: 14,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  Shadow(
-                    color: AppColors.neonPurple.withValues(alpha: 0.42),
-                    blurRadius: 24,
-                  ),
-                  Shadow(
-                    color: AppColors.neonPink.withValues(alpha: 0.22),
-                    blurRadius: 34,
-                  ),
-                ],
-              ),
-            ),
-            Transform.translate(
-              offset: const Offset(0, -0.98),
-              child: Padding(
-                padding: const EdgeInsets.only(right: 20),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    // Aura detrás de LUV.
-                    Text(
-                      'LUV',
-                      style: GoogleFonts.playfairDisplay(
-                        color: AppColors.neonPink.withValues(alpha: 0.55),
-                        fontSize: logoFontSize,
-                        fontWeight: FontWeight.w700,
-                        fontStyle: FontStyle.italic,
-                        letterSpacing: 0.9,
-                        height: 1,
-                        shadows: [
-                          Shadow(
-                            color: AppColors.neonPink.withValues(alpha: 0.95),
-                            blurRadius: 16,
-                          ),
-                          Shadow(
-                            color: AppColors.neonPurple.withValues(alpha: 0.82),
-                            blurRadius: 26,
-                          ),
-                          Shadow(
-                            color: AppColors.neonBlue.withValues(alpha: 0.35),
-                            blurRadius: 38,
-                          ),
-                          Shadow(
-                            color: Colors.black.withValues(alpha: 0.95),
-                            blurRadius: 9,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Texto principal con degradado.
-                    ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) {
-                        return const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFFB978FF),
-                            Color(0xFFFF5DDA),
-                            Color(0xFF8B4DFF),
-                          ],
-                        ).createShader(
-                          Rect.fromLTRB(
-                            bounds.left,
-                            bounds.top,
-                            bounds.right + 30,
-                            bounds.bottom,
-                          ),
-                        );
-                      },
-                      child: Text(
-                        'LUV',
-                        style: GoogleFonts.playfairDisplay(
-                          color: const Color(0xFF7B2CFF),
-                          fontSize: logoFontSize,
-                          fontWeight: FontWeight.w700,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: 0.9,
-                          height: 1,
+                  child: Text(
+                    'NIMAHUB',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: logoFontSize,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 3.0,
+                      height: 1,
+                      shadows: [
+                        Shadow(
+                          color: Colors.white.withValues(alpha: 0.48),
+                          blurRadius: 4,
                         ),
-                      ),
+                        Shadow(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          blurRadius: 9,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -2521,14 +3870,14 @@ class _AchievementBannerState extends State<_AchievementBanner> {
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF3B3B).withValues(alpha: 0.38),
-                  blurRadius: 12,
-                  spreadRadius: 0.3,
+                  color: Colors.white.withValues(alpha: 0.24),
+                  blurRadius: 8,
+                  spreadRadius: 0.2,
                 ),
                 BoxShadow(
-                  color: const Color(0xFFFF1744).withValues(alpha: 0.18),
-                  blurRadius: 22,
-                  spreadRadius: 0.8,
+                  color: Colors.white.withValues(alpha: 0.10),
+                  blurRadius: 16,
+                  spreadRadius: 0.6,
                 ),
               ],
             ),
@@ -2553,10 +3902,8 @@ class _AchievementBannerState extends State<_AchievementBanner> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: const Color(
-                            0xFFFF3B3B,
-                          ).withValues(alpha: 0.95),
-                          width: 1.2,
+                          color: Colors.white.withValues(alpha: 0.78),
+                          width: 1.0,
                         ),
                       ),
                       child: ClipRRect(
@@ -2569,7 +3916,7 @@ class _AchievementBannerState extends State<_AchievementBanner> {
                           alignment: Alignment.center,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
-                              color: AppColors.neonPink.withValues(alpha: 0.20),
+                              color: AppColors.widgetBackground,
                               alignment: Alignment.center,
                               child: Text(
                                 'Banner ${index + 1}',
@@ -2613,7 +3960,11 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.88),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.widgetBackground, AppColors.widgetBackgroundDeep],
+        ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.88),
@@ -2680,6 +4031,7 @@ class _QuickActionOverlay extends StatefulWidget {
     required this.onQuickSettings,
     required this.onQuickAlbumPhoto,
     required this.onQuickHome,
+    super.key,
   });
 
   final Animation<double> progress;
@@ -2918,6 +4270,34 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
     });
   }
 
+  void closeFavoritePicker() {
+    if (_favoritePickerAnchor == null) {
+      return;
+    }
+
+    widget.onFavoritePickerOpenChanged(false);
+
+    _favoritePickerController?.dispose();
+    _favoritePickerController = null;
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _favoriteSlotBeingEdited = null;
+      _favoritePickerAnchor = null;
+      _favoritePickerActions = [];
+
+      _favoritePickerSelectedIndex = 0;
+      _favoritePickerPendingIndex = 0;
+      _favoritePickerIsScrolling = false;
+
+      // La rueda circular conserva su posición.
+      _pendingStep = 0;
+    });
+  }
+
   void _confirmFavoritePickerSelection() {
     final favoriteSlot = _favoriteSlotBeingEdited;
 
@@ -2929,23 +4309,7 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
 
     widget.onFavoriteChanged(favoriteSlot, selectedAction.label);
 
-    widget.onFavoritePickerOpenChanged(false);
-
-    _favoritePickerController?.dispose();
-    _favoritePickerController = null;
-
-    setState(() {
-      _favoriteSlotBeingEdited = null;
-      _favoritePickerAnchor = null;
-      _favoritePickerActions = [];
-      _favoritePickerSelectedIndex = 0;
-
-      // No modificar _centerIndex.
-      // No modificar _dragProgress.
-      // Así la rueda conserva exactamente su posición actual.
-
-      _pendingStep = 0;
-    });
+    closeFavoritePicker();
   }
 
   @override
@@ -3098,7 +4462,7 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
 
           // Radio de la tuerca.
           // Más radio = botones más separados.
-          const double radius = 120;
+          const double radius = 110;
 
           // Tamaño del fondo circular difuminado.
           // El radio del menú es 150, por eso el diámetro base es 300.
@@ -3184,8 +4548,6 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
                           (rawValue * 1.35).clamp(0.0, 1.0),
                         );
 
-                        final Color selectedColor = selectedAction.color;
-
                         return Opacity(
                           opacity: value,
                           child: ShaderMask(
@@ -3230,28 +4592,31 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
                                     ),
                                     child: ColoredBox(
                                       color: const Color(
-                                        0xFF05030B,
-                                      ).withValues(alpha: 0.48),
+                                        0xFF000000,
+                                      ).withValues(alpha: 0.99),
                                     ),
                                   ),
 
-                                  // Base oscura violeta.
+                                  // Base oscura neutra del menú.
+                                  // No adopta el color de la herramienta seleccionada.
                                   DecoratedBox(
                                     decoration: BoxDecoration(
                                       gradient: RadialGradient(
                                         center: const Alignment(0, 0.08),
                                         radius: 0.94,
                                         colors: [
-                                          selectedColor.withValues(alpha: 0.20),
                                           const Color(
-                                            0xFF2B1248,
-                                          ).withValues(alpha: 0.24),
+                                            0xFF17171A,
+                                          ).withValues(alpha: 0.52),
                                           const Color(
-                                            0xFF120A20,
+                                            0xFF101012,
                                           ).withValues(alpha: 0.66),
                                           const Color(
-                                            0xFF05030A,
-                                          ).withValues(alpha: 0.82),
+                                            0xFF09090B,
+                                          ).withValues(alpha: 0.84),
+                                          const Color(
+                                            0xFF000000,
+                                          ).withValues(alpha: 0.94),
                                           Colors.transparent,
                                         ],
                                         stops: const [
@@ -3302,14 +4667,8 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
                                               final double localY =
                                                   buttonY - menuBlurTop;
 
-                                              final int actionIndex =
-                                                  _wrapIndex(
-                                                    _centerIndex + slot,
-                                                    actions.length,
-                                                  );
-
-                                              final Color glowColor =
-                                                  actions[actionIndex].color;
+                                              const Color glowColor =
+                                                  Colors.white;
 
                                               final double distance = visualSlot
                                                   .abs();
@@ -3364,20 +4723,23 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
                                     ),
                                   ),
 
-                                  // Luz suave central para integrar todos los colores.
+                                  // Zona central neutra para impedir que los colores
+                                  // de los iconos alcancen el botón principal.
                                   DecoratedBox(
                                     decoration: BoxDecoration(
                                       gradient: RadialGradient(
                                         center: const Alignment(0, 0.26),
                                         radius: 0.68,
                                         colors: [
-                                          selectedColor.withValues(alpha: 0.14),
                                           const Color(
-                                            0xFF8B5CFF,
-                                          ).withValues(alpha: 0.08),
+                                            0xFF070709,
+                                          ).withValues(alpha: 0.96),
+                                          const Color(
+                                            0xFF09090B,
+                                          ).withValues(alpha: 0.70),
                                           Colors.transparent,
                                         ],
-                                        stops: const [0.00, 0.52, 1.00],
+                                        stops: const [0.00, 0.42, 1.00],
                                       ),
                                     ),
                                   ),
@@ -3498,7 +4860,7 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
     final double directionToCenter = (centerX - baseX).sign;
     final double x =
         baseX + (directionToCenter * sidePullTowardCenter * outerFactor);
-    final double buttonSize = 64;
+    final double buttonSize = 62;
     final double distanceFromCenter = visualSlot.abs();
     final int favoriteSlot = widget.favoriteLabels.indexOf(action.label);
     // Se conserva para permitir editar únicamente los favoritos.
@@ -3582,17 +4944,19 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
     }
 
     const double itemSize = 64;
-    const double itemExtent = 82;
-    const double railWidth = 110;
 
-    // Cinco posiciones visibles:
-    // dos arriba, selector central y dos abajo.
-    // Área visible:
-    // 2 opciones arriba + el icono seleccionado.
-    // No se muestra ninguna opción debajo.
-    const double visibleRailHeight = itemExtent * 3.0;
-    // El ListWheel sigue teniendo cinco posiciones internamente.
-    // Esto coloca su centro magnético en el tercer icono.
+    // Mantiene una separación mínima entre los iconos.
+    const double itemExtent = 70;
+
+    // Solo 3 px a cada lado del círculo.
+    const double capsulePadding = 3;
+    const double railWidth = itemSize + (capsulePadding * 2);
+
+    // Dos iconos superiores y el icono seleccionado,
+    // con la cápsula rozando sus bordes.
+    const double visibleRailHeight =
+        (itemExtent * 2.5) + (itemSize / 2) + capsulePadding;
+
     const double wheelHeight = itemExtent * 5;
 
     final double left = (anchor.dx - (railWidth / 2)).clamp(
@@ -3616,7 +4980,7 @@ class _QuickActionOverlayState extends State<_QuickActionOverlay>
               // El radio se adapta a la proporción vertical del menú.
               // Esto crea un desvanecimiento ovalado en lugar
               // de dos líneas horizontales planas.
-              final double ovalRadius = (bounds.height / bounds.width) * 1.03;
+              final double ovalRadius = (bounds.height / bounds.width) * 0.96;
 
               return RadialGradient(
                 center: Alignment.center,
@@ -3803,8 +5167,8 @@ class _VerticalPickerOption extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: size + 12,
-        height: size + 12,
+        width: size,
+        height: size,
         child: Center(
           child: Container(
             width: size,
@@ -3813,21 +5177,34 @@ class _VerticalPickerOption extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  action.color.withValues(alpha: 0.26),
+                  const Color(0xFFE2E2E5).withValues(alpha: 0.34),
                   AppColors.surface.withValues(alpha: 0.96),
                 ],
               ),
               border: Border.all(
-                color: action.color.withValues(alpha: 0.90),
+                color: Colors.white.withValues(alpha: 0.95),
                 width: 1.6,
               ),
-
-              // Glow pequeño que cabe dentro del rail.
               boxShadow: [
                 BoxShadow(
-                  color: action.color.withValues(alpha: 0.20),
-                  blurRadius: 10,
+                  color: Colors.white.withValues(alpha: 0.62),
+                  blurRadius: 8,
                   spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.30),
+                  blurRadius: 18,
+                  spreadRadius: 1,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  blurRadius: 34,
+                  spreadRadius: 4,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  blurRadius: 70,
+                  spreadRadius: 9,
                 ),
               ],
             ),
@@ -4024,25 +5401,32 @@ class _GearActionButton extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        color.withValues(alpha: 0.30),
+                        const Color(0xFFE2E2E5).withValues(alpha: 0.34),
                         AppColors.surface.withValues(alpha: 0.96),
                       ],
                     ),
                     border: Border.all(
-                      color: color.withValues(alpha: 0.95),
-                      width: 1.8,
+                      color: Colors.white.withValues(alpha: 0.95),
+                      width: 1.6,
                     ),
                     boxShadow: [
-                      // Glow concentrado alrededor del botón.
                       BoxShadow(
-                        color: color.withValues(alpha: 0.55),
-                        blurRadius: 22,
-                        spreadRadius: 3,
+                        color: Colors.white.withValues(alpha: 0.62),
+                        blurRadius: 8,
+                        spreadRadius: 0,
                       ),
-
-                      // Aura exterior amplia.
                       BoxShadow(
-                        color: color.withValues(alpha: 0.30),
+                        color: Colors.white.withValues(alpha: 0.30),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        blurRadius: 34,
+                        spreadRadius: 4,
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.08),
                         blurRadius: 70,
                         spreadRadius: 9,
                       ),
@@ -4082,8 +5466,8 @@ class _GearActionButton extends StatelessWidget {
   }
 }
 
-class _NimaluvBottomNav extends StatelessWidget {
-  const _NimaluvBottomNav({
+class _NimahubBottomNav extends StatelessWidget {
+  const _NimahubBottomNav({
     required this.isQuickMenuOpen,
     required this.isFavoritePickerOpen,
     required this.quickMenuProgress,
@@ -4120,7 +5504,7 @@ class _NimaluvBottomNav extends StatelessWidget {
       height: navHeight + bottomExtension,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final double barWidth = (constraints.maxWidth * 0.56)
+          final double barWidth = (constraints.maxWidth * 0.40)
               .clamp(210.0, 320.0)
               .toDouble();
 
@@ -4205,7 +5589,7 @@ class _NimaluvBottomNav extends StatelessWidget {
                             showLabel: true,
                           ),
 
-                          const SizedBox(width: 76),
+                          const SizedBox(width: 64),
 
                           _BottomNavItem(
                             icon: Icons.bolt_rounded,
@@ -4224,7 +5608,7 @@ class _NimaluvBottomNav extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 83 + bottomExtension,
+                bottom: 77 + bottomExtension,
                 child: IgnorePointer(
                   child: AnimatedOpacity(
                     opacity: isFavoritePickerOpen ? 0.0 : 1.0,
@@ -4294,7 +5678,7 @@ class _CenterMemoryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.translate(
-      offset: const Offset(0, -20),
+      offset: const Offset(0, -19),
       child: GestureDetector(
         onTap: onTap,
         onLongPress: onLongPress,
@@ -4302,78 +5686,52 @@ class _CenterMemoryButton extends StatelessWidget {
         child: SizedBox(
           width: 88,
           height: 88,
-          child: AnimatedBuilder(
-            animation: progress,
-            builder: (context, child) {
-              final double rawValue = progress.value.clamp(0.0, 1.0);
+          child: Center(
+            child: AnimatedScale(
+              scale: 1.0,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
 
-              final double ledProgress = Curves.easeInOutCubic.transform(
-                rawValue,
-              );
+                  // Aro sólido blanco neón.
+                  color: const Color(0xFFF8FBFF),
 
-              final double glowValue = Curves.easeOutCubic.transform(rawValue);
-
-              return CustomPaint(
-                painter: _CenterLedPainter(
-                  progress: ledProgress,
-                  glowOpacity: glowValue,
-                  isActive: isActive,
-                ),
-                child: child,
-              );
-            },
-            child: Center(
-              child: AnimatedScale(
-                scale: isActive ? 0.94 : 1.0,
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFFF4FD8),
-                        Color(0xFF8B5CFF),
-                        Color(0xFF35E8FF),
-                      ],
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.68),
+                      blurRadius: 10,
+                      spreadRadius: 0.6,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFFF4FD8).withValues(alpha: 0.42),
-                        blurRadius: 22,
-                        spreadRadius: 1.4,
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.30),
+                      blurRadius: 22,
+                      spreadRadius: 1.0,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Container(
+                    width: 53,
+                    height: 53,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF080812).withValues(alpha: 0.94),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.14),
+                        width: 0.9,
                       ),
-                      BoxShadow(
-                        color: const Color(0xFF35E8FF).withValues(alpha: 0.22),
-                        blurRadius: 26,
-                        spreadRadius: 1.2,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 53,
-                      height: 53,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFF080812).withValues(alpha: 0.94),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.14),
-                          width: 0.9,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: SizedBox(
-                        width: 57,
-                        height: 57,
-                        child: Image.asset(
-                          'assets/images/nimaluv_logo.png',
-                          fit: BoxFit.contain,
-                        ),
+                    ),
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: 57,
+                      height: 57,
+                      child: Image.asset(
+                        'assets/images/nimahub_logo.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                   ),
@@ -4387,121 +5745,19 @@ class _CenterMemoryButton extends StatelessWidget {
   }
 }
 
-class _CenterLedPainter extends CustomPainter {
-  const _CenterLedPainter({
-    required this.progress,
-    required this.glowOpacity,
-    required this.isActive,
-  });
-
-  final double progress;
-  final double glowOpacity;
-  final bool isActive;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-
-    final ringRect = Rect.fromCircle(center: center, radius: 33);
-
-    final basePaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.10);
-
-    canvas.drawArc(ringRect, -math.pi / 2, math.pi * 2, false, basePaint);
-
-    if (progress <= 0) return;
-
-    final glowPaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.2
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
-      ..shader = const SweepGradient(
-        startAngle: -math.pi / 2,
-        endAngle: math.pi * 1.5,
-        colors: [
-          Color(0x00FFFFFF),
-          Color(0xFFFF4FD8),
-          Color(0xFF8B5CFF),
-          Color(0xFF35E8FF),
-          Color(0xFFFFFFFF),
-        ],
-      ).createShader(ringRect)
-      ..color = Colors.white.withValues(alpha: 0.42 * glowOpacity);
-
-    canvas.drawArc(
-      ringRect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      glowPaint,
-    );
-
-    final ledPaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round
-      ..shader = const SweepGradient(
-        startAngle: -math.pi / 2,
-        endAngle: math.pi * 1.5,
-        colors: [
-          Color(0xFFFF4FD8),
-          Color(0xFF8B5CFF),
-          Color(0xFF35E8FF),
-          Color(0xFFFFFFFF),
-        ],
-      ).createShader(ringRect);
-
-    canvas.drawArc(
-      ringRect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      ledPaint,
-    );
-
-    final tipAngle = -math.pi / 2 + (math.pi * 2 * progress);
-
-    final tipOffset = Offset(
-      center.dx + math.cos(tipAngle) * 33,
-      center.dy + math.sin(tipAngle) * 33,
-    );
-
-    final tipPaint = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.fill
-      ..color = Colors.white.withValues(alpha: 0.92);
-
-    canvas.drawCircle(tipOffset, 2.5, tipPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CenterLedPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.glowOpacity != glowOpacity ||
-        oldDelegate.isActive != isActive;
-  }
-}
-
 class _BottomNavItem extends StatelessWidget {
   const _BottomNavItem({
     required this.icon,
     required this.label,
+    required this.onTap,
     this.isSelected = false,
-    this.onTap,
     this.showLabel = true,
   });
 
   final IconData icon;
   final String label;
+  final VoidCallback onTap;
   final bool isSelected;
-  final VoidCallback? onTap;
   final bool showLabel;
 
   @override
@@ -4509,8 +5765,8 @@ class _BottomNavItem extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
         splashColor: Colors.black.withValues(alpha: 0.06),
         highlightColor: Colors.white.withValues(alpha: 0.18),
         child: AnimatedContainer(
@@ -5356,6 +6612,679 @@ class _EmptyPetsCard extends StatelessWidget {
                 style: TextStyle(color: Color(0xFF8E9099), fontSize: 11),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardPreviewShell extends StatelessWidget {
+  const _DashboardPreviewShell({
+    required this.accentColor,
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+  });
+
+  final Color accentColor;
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: padding,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.widgetBackground, AppColors.widgetBackgroundDeep],
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.72),
+          width: 1.0,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.22),
+            blurRadius: 8,
+            spreadRadius: 0.2,
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.10),
+            blurRadius: 16,
+            spreadRadius: 0.6,
+          ),
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.10),
+            blurRadius: 20,
+            spreadRadius: 0.2,
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _BudgetSummaryWidget extends StatelessWidget {
+  const _BudgetSummaryWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonCyan,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet_rounded,
+                color: AppColors.neonCyan,
+                size: 18,
+              ),
+              SizedBox(width: 7),
+              Expanded(
+                child: Text(
+                  'Presupuesto',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            '\$1.240.000',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: LinearProgressIndicator(
+                  value: 0.62,
+                  minHeight: 5,
+                  color: AppColors.neonCyan,
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                '62% utilizado este mes',
+                style: TextStyle(color: Color(0xFF9698A2), fontSize: 9.5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextDateWidget extends StatelessWidget {
+  const _NextDateWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonPink,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 29,
+                height: 29,
+                decoration: BoxDecoration(
+                  color: AppColors.neonPink.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  color: AppColors.neonPink,
+                  size: 16,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.neonPink.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'EN 3 DÍAS',
+                  style: TextStyle(
+                    color: AppColors.neonPink,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            'Cena italiana',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Row(
+            children: [
+              Icon(Icons.schedule_rounded, color: Color(0xFF999BA5), size: 13),
+              SizedBox(width: 5),
+              Text(
+                'Sábado · 7:30 PM',
+                style: TextStyle(color: Color(0xFF999BA5), fontSize: 9.5),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MoodSummaryWidget extends StatelessWidget {
+  const _MoodSummaryWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonPurple,
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.sentiment_satisfied_alt_rounded,
+                color: AppColors.neonPurple,
+                size: 18,
+              ),
+              Spacer(),
+              Text(
+                'HOY',
+                style: TextStyle(
+                  color: Color(0xFF898B94),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            'Muy bien',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          Text(
+            '4.6 / 5',
+            style: TextStyle(
+              color: AppColors.neonPurple,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WaterTrackerWidget extends StatelessWidget {
+  const _WaterTrackerWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonBlue,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.water_drop_rounded,
+                color: AppColors.neonBlue,
+                size: 18,
+              ),
+              Spacer(),
+              Text(
+                'AGUA',
+                style: TextStyle(
+                  color: Color(0xFF898B94),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            '5 / 8',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: 0.625,
+              minHeight: 5,
+              color: AppColors.neonBlue,
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkoutProgressWidget extends StatelessWidget {
+  const _WorkoutProgressWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: const Color(0xFF7CFFB2),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.fitness_center_rounded,
+                color: Color(0xFF7CFFB2),
+                size: 18,
+              ),
+              Spacer(),
+              Text(
+                'SEMANA',
+                style: TextStyle(
+                  color: Color(0xFF898B94),
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const Text(
+            '3 / 5',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: 0.60,
+              minHeight: 5,
+              color: const Color(0xFF7CFFB2),
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AlbumHighlightWidget extends StatelessWidget {
+  const _AlbumHighlightWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonPurple,
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.widgetBackground,
+                    Color(0xFF202227),
+                    AppColors.widgetBackgroundDeep,
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              right: 12,
+              top: 10,
+              child: Icon(
+                Icons.photo_library_rounded,
+                color: Colors.white.withValues(alpha: 0.28),
+                size: 42,
+              ),
+            ),
+            const Positioned(
+              left: 12,
+              right: 12,
+              bottom: 11,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Recuerdo destacado',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    'Cartagena · hace 2 días',
+                    style: TextStyle(color: Color(0xFFC8C2D2), fontSize: 9.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpecialDateCountdownWidget extends StatelessWidget {
+  const _SpecialDateCountdownWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonOrange,
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.neonOrange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: const Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '12',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'JUL',
+                  style: TextStyle(
+                    color: AppColors.neonOrange,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 11),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Aniversario',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 5),
+                Text(
+                  'Faltan 24 días',
+                  style: TextStyle(
+                    color: AppColors.neonOrange,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalsProgressWidget extends StatelessWidget {
+  const _GoalsProgressWidget();
+
+  @override
+  Widget build(BuildContext context) {
+    return _DashboardPreviewShell(
+      accentColor: AppColors.neonPink,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.flag_rounded, color: AppColors.neonPink, size: 19),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Metas compartidas',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '4 / 6',
+                style: TextStyle(
+                  color: AppColors.neonPink,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: 0.66,
+              minHeight: 6,
+              color: AppColors.neonPink,
+              backgroundColor: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: const [
+              _GoalPreviewChip(text: 'Viaje', completed: true),
+              _GoalPreviewChip(text: 'Ahorro', completed: true),
+              _GoalPreviewChip(text: 'Gym', completed: false),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalPreviewChip extends StatelessWidget {
+  const _GoalPreviewChip({required this.text, required this.completed});
+
+  final String text;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: completed
+            ? AppColors.neonPink.withValues(alpha: 0.13)
+            : Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            completed
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            color: completed ? AppColors.neonPink : const Color(0xFF8D8F98),
+            size: 11,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              color: completed ? Colors.white : const Color(0xFF9A9CA5),
+              fontSize: 8.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FullScreenNeonEdge extends StatelessWidget {
+  const _FullScreenNeonEdge({required this.alignment});
+
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SizedBox(
+        width: 8,
+        height: double.infinity,
+        child: Align(
+          alignment: alignment,
+          child: Container(
+            width: 1.4,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.98),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.90),
+                  blurRadius: 6,
+                  spreadRadius: 0.4,
+                ),
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.48),
+                  blurRadius: 13,
+                  spreadRadius: 0.8,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroEditActionButton extends StatelessWidget {
+  const _HeroEditActionButton({
+    required this.icon,
+    required this.onTap,
+    this.isPrimary = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isPrimary
+                ? Colors.white
+                : Colors.black.withValues(alpha: 0.68),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: isPrimary ? 0.92 : 0.50),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 10,
+              ),
+              if (isPrimary)
+                BoxShadow(
+                  color: Colors.white.withValues(alpha: 0.22),
+                  blurRadius: 12,
+                ),
+            ],
+          ),
+          child: Icon(
+            icon,
+            color: isPrimary ? Colors.black : Colors.white,
+            size: 21,
           ),
         ),
       ),

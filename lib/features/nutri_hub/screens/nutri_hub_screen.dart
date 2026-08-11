@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nimaluv_app/core/theme/app_theme.dart';
+import 'package:nimahub_app/core/theme/app_theme.dart';
 
 class NutriHubScreen extends StatelessWidget {
   const NutriHubScreen({super.key});
@@ -21,7 +21,7 @@ class NutriHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: nimaluvSystemUiStyle,
+      value: nimahubSystemUiStyle,
       child: Scaffold(
         extendBody: true,
         backgroundColor: _background,
@@ -30,7 +30,7 @@ class NutriHubScreen extends StatelessWidget {
           elevation: 0,
           backgroundColor: _background,
           foregroundColor: Colors.white,
-          systemOverlayStyle: nimaluvSystemUiStyle,
+          systemOverlayStyle: nimahubSystemUiStyle,
           title: const Text(
             'Nutri Hub',
             style: TextStyle(fontWeight: FontWeight.w800),

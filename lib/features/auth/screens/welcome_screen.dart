@@ -16,7 +16,7 @@ class WelcomeScreen extends StatelessWidget {
               const Icon(Icons.favorite, size: 90),
               const SizedBox(height: 24),
               const Text(
-                'Nimaluv',
+                'Nimahub',
                 style: TextStyle(
                   fontSize: 38,
                   fontWeight: FontWeight.bold,

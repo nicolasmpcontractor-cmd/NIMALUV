@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nimaluv_app/core/theme/app_theme.dart';
+import 'package:nimahub_app/core/theme/app_theme.dart';
 
 class KpiScreen extends StatelessWidget {
   const KpiScreen({super.key});

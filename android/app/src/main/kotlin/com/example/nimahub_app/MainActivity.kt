@@ -1,4 +1,4 @@
-package com.example.nimaluv_app
+package com.example.nimahub_app
 
 import io.flutter.embedding.android.FlutterActivity
 

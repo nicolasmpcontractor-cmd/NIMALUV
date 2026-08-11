@@ -32,7 +32,7 @@ class NotesDatabase {
 
     return openDatabase(
       databasePath,
-      version: 15,
+      version: 16,
       onConfigure: (database) async {
         await database.execute('PRAGMA foreign_keys = ON');
       },
@@ -45,6 +45,7 @@ class NotesDatabase {
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL,
           is_pinned INTEGER NOT NULL DEFAULT 0,
+          emoji TEXT NOT NULL DEFAULT '',
           board_x REAL,
           board_y REAL,
           parent_folder_id TEXT,
@@ -224,6 +225,19 @@ CREATE UNIQUE INDEX index_tracker_entries_external_reference
             ALTER TABLE note_pages
             ADD COLUMN page_kind TEXT NOT NULL DEFAULT 'note'
             ''');
+        }
+
+        final hasEmoji = await _columnExists(
+          database,
+          tableName: 'note_pages',
+          columnName: 'emoji',
+        );
+
+        if (!hasEmoji) {
+          await database.execute('''
+    ALTER TABLE note_pages
+    ADD COLUMN emoji TEXT NOT NULL DEFAULT ''
+    ''');
         }
 
         if (oldVersion < 4) {
@@ -663,6 +677,7 @@ CREATE TABLE IF NOT EXISTS tracker_pauses (
             return kind.name == (pageRow['page_kind'] as String? ?? 'note');
           }, orElse: () => NotePageKind.note),
           isPinned: (pageRow['is_pinned'] as int) == 1,
+          emoji: pageRow['emoji'] as String? ?? '',
           boardX: (pageRow['board_x'] as num?)?.toDouble(),
           boardY: (pageRow['board_y'] as num?)?.toDouble(),
           parentFolderId: pageRow['parent_folder_id'] as String?,
@@ -1170,6 +1185,7 @@ CREATE TABLE IF NOT EXISTS tracker_pauses (
       'created_at': note.createdAt.millisecondsSinceEpoch,
       'updated_at': note.updatedAt.millisecondsSinceEpoch,
       'is_pinned': note.isPinned ? 1 : 0,
+      'emoji': note.emoji,
       'board_x': note.boardX,
       'board_y': note.boardY,
       'parent_folder_id': note.parentFolderId,

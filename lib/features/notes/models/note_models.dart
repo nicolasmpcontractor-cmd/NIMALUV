@@ -11,6 +11,10 @@ enum NoteBlockType {
   callout,
   image,
   divider,
+  file,
+  tracker,
+  database,
+  ribbon,
 }
 
 enum NoteBlockStyle { normal, heading1, heading2, quote, callout }
@@ -18,6 +22,38 @@ enum NoteBlockStyle { normal, heading1, heading2, quote, callout }
 enum NoteTextAlignment { left, center, right, justify }
 
 enum NoteListMarkerStyle { automatic, numbered, lettered }
+
+class NoteBlockLink {
+  const NoteBlockLink({
+    required this.id,
+    required this.start,
+    required this.end,
+    required this.label,
+    required this.target,
+  });
+
+  final String id;
+  final int start;
+  final int end;
+  final String label;
+  final String target;
+
+  NoteBlockLink copyWith({
+    String? id,
+    int? start,
+    int? end,
+    String? label,
+    String? target,
+  }) {
+    return NoteBlockLink(
+      id: id ?? this.id,
+      start: start ?? this.start,
+      end: end ?? this.end,
+      label: label ?? this.label,
+      target: target ?? this.target,
+    );
+  }
+}
 
 class NoteBlock {
   const NoteBlock({
@@ -28,15 +64,18 @@ class NoteBlock {
     this.imagePath,
     this.style = NoteBlockStyle.normal,
     this.colorValue,
+    this.highlightColorValue,
     this.fontFamily = 'Inter',
     this.fontSize,
     this.textColorValue,
     this.textAlignment = NoteTextAlignment.left,
     this.listMarkerStyle = NoteListMarkerStyle.automatic,
     this.checklistStates = const <bool>[],
+    this.links = const <NoteBlockLink>[],
     this.groupId,
     this.groupTitle = '',
     this.groupCollapsed = false,
+    this.groupColorValue,
     this.isBold = false,
     this.isItalic = false,
     this.isUnderline = false,
@@ -49,15 +88,18 @@ class NoteBlock {
   final String? imagePath;
   final NoteBlockStyle style;
   final int? colorValue;
+  final int? highlightColorValue;
   final String fontFamily;
   final double? fontSize;
   final int? textColorValue;
   final NoteTextAlignment textAlignment;
   final NoteListMarkerStyle listMarkerStyle;
   final List<bool> checklistStates;
+  final List<NoteBlockLink> links;
   final String? groupId;
   final String groupTitle;
   final bool groupCollapsed;
+  final int? groupColorValue;
   final bool isBold;
   final bool isItalic;
   final bool isUnderline;
@@ -71,6 +113,8 @@ class NoteBlock {
     NoteBlockStyle? style,
     int? colorValue,
     bool clearColorValue = false,
+    int? highlightColorValue,
+    bool clearHighlightColorValue = false,
     String? fontFamily,
     double? fontSize,
     bool clearFontSize = false,
@@ -80,10 +124,14 @@ class NoteBlock {
     NoteListMarkerStyle? listMarkerStyle,
     List<bool>? checklistStates,
     bool clearChecklistStates = false,
+    List<NoteBlockLink>? links,
+    bool clearLinks = false,
     String? groupId,
     bool clearGroupId = false,
     String? groupTitle,
     bool? groupCollapsed,
+    int? groupColorValue,
+    bool clearGroupColorValue = false,
     bool? isBold,
     bool? isItalic,
     bool? isUnderline,
@@ -96,6 +144,9 @@ class NoteBlock {
       imagePath: clearImagePath ? null : imagePath ?? this.imagePath,
       style: style ?? this.style,
       colorValue: clearColorValue ? null : colorValue ?? this.colorValue,
+      highlightColorValue: clearHighlightColorValue
+          ? null
+          : highlightColorValue ?? this.highlightColorValue,
       fontFamily: fontFamily ?? this.fontFamily,
       fontSize: clearFontSize ? null : fontSize ?? this.fontSize,
       textColorValue: clearTextColorValue
@@ -106,9 +157,13 @@ class NoteBlock {
       checklistStates: clearChecklistStates
           ? const <bool>[]
           : checklistStates ?? this.checklistStates,
+      links: clearLinks ? const <NoteBlockLink>[] : links ?? this.links,
       groupId: clearGroupId ? null : groupId ?? this.groupId,
       groupTitle: groupTitle ?? this.groupTitle,
       groupCollapsed: groupCollapsed ?? this.groupCollapsed,
+      groupColorValue: clearGroupColorValue
+          ? null
+          : groupColorValue ?? this.groupColorValue,
       isBold: isBold ?? this.isBold,
       isItalic: isItalic ?? this.isItalic,
       isUnderline: isUnderline ?? this.isUnderline,
@@ -139,6 +194,7 @@ class NotePage {
     required this.blocks,
     this.kind = NotePageKind.note,
     this.isPinned = false,
+    this.emoji = '',
     this.boardX,
     this.boardY,
     this.parentFolderId,
@@ -152,6 +208,7 @@ class NotePage {
   final List<NoteBlock> blocks;
   final NotePageKind kind;
   final bool isPinned;
+  final String emoji;
 
   // Posición persistente dentro del Modo Pizarrón.
   final double? boardX;
@@ -182,6 +239,7 @@ class NotePage {
     List<NoteBlock>? blocks,
     NotePageKind? kind,
     bool? isPinned,
+    String? emoji,
     double? boardX,
     double? boardY,
     bool clearBoardPosition = false,
@@ -197,6 +255,7 @@ class NotePage {
       blocks: blocks ?? this.blocks,
       kind: kind ?? this.kind,
       isPinned: isPinned ?? this.isPinned,
+      emoji: emoji ?? this.emoji,
       boardX: clearBoardPosition ? null : boardX ?? this.boardX,
       boardY: clearBoardPosition ? null : boardY ?? this.boardY,
       parentFolderId: clearParentFolderId

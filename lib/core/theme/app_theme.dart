@@ -2,19 +2,21 @@ import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color background = Color(0xFF11091F);
-  static const Color backgroundSoft = Color(0xFF070A12);
+  static const Color background = Color(0xFF000000);
+  static const Color backgroundSoft = Color(0xFF050505);
 
-  static const Color surface = Color(0xFF090E1A);
-  static const Color surfaceSoft = Color(0xFF0D1424);
-  static const Color surfaceLight = Color(0xFF121B2E);
+  static const Color surface = Color(0xFF0A0A0A);
+  static const Color surfaceSoft = Color(0xFF101010);
+  static const Color surfaceLight = Color(0xFF181818);
+  static const Color widgetBackground = Color(0xFF23252A);
+  static const Color widgetBackgroundDeep = Color(0xFF191B1F);
 
   static const Color primary = Color(0xFFF5F7FF);
   static const Color secondary = Color(0xFFC4C7D8);
   static const Color muted = Color(0xFF84889A);
 
-  static const Color border = Color(0xFF1B2740);
-  static const Color divider = Color(0xFF141B2B);
+  static const Color border = Color(0xFF292929);
+  static const Color divider = Color(0xFF1A1A1A);
 
   static const Color neonPink = Color(0xFFFF3FD4);
   static const Color neonBlue = Color(0xFF246BFF);
@@ -30,7 +32,7 @@ class AppColors {
   static const Color danger = Color(0xFFFF6B6B);
 }
 
-const SystemUiOverlayStyle nimaluvSystemUiStyle = SystemUiOverlayStyle(
+const SystemUiOverlayStyle nimahubSystemUiStyle = SystemUiOverlayStyle(
   statusBarColor: Colors.transparent,
   statusBarIconBrightness: Brightness.light,
   statusBarBrightness: Brightness.dark,
@@ -64,7 +66,7 @@ class AppTheme {
         backgroundColor: Colors.transparent,
         foregroundColor: AppColors.primary,
         elevation: 0,
-        systemOverlayStyle: nimaluvSystemUiStyle,
+        systemOverlayStyle: nimahubSystemUiStyle,
         centerTitle: true,
         titleTextStyle: TextStyle(
           color: AppColors.primary,
